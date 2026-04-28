@@ -1,52 +1,162 @@
-# 🔐 OAuth 2.0
-[![Build Status](https://drone.owncloud.com/api/badges/owncloud/oauth2/status.svg?branch=master)](https://drone.owncloud.com/owncloud/oauth2)
-[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=owncloud_oauth2&metric=alert_status)](https://sonarcloud.io/dashboard?id=owncloud_oauth2)
-[![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=owncloud_oauth2&metric=security_rating)](https://sonarcloud.io/dashboard?id=owncloud_oauth2)
-[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=owncloud_oauth2&metric=coverage)](https://sonarcloud.io/dashboard?id=owncloud_oauth2)
+# OAuth 2.0
 
-This app implements the [OAuth 2.0 Authorization Code Flow](https://tools.ietf.org/html/rfc6749#section-4.1).
+OAuth 2.0 token-based authorization interface for [owncloud.online](https://github.com/BWTECH-github/owncloud.online), maintained by [BW-Tech GmbH](https://bw.tech). This is a PHP 8.4 fork of [owncloud/oauth2](https://github.com/owncloud/oauth2).
 
-## Installing the app
-Place the content of this repository in **owncloud/apps/oauth2**.
+The app implements the [OAuth 2.0 Authorization Code Flow](https://tools.ietf.org/html/rfc6749#section-4.1) including the [PKCE extension](https://datatracker.ietf.org/doc/html/rfc7636), and exposes an [OpenID Connect UserInfo](https://openid.net/specs/openid-connect-core-1_0.html#UserInfo) endpoint so existing ownCloud clients (Desktop, Android, iOS) and third-party integrations can authenticate without ever holding the user's password.
 
-## Using the app
+## Features
 
-### Endpoints
-* Authorization URL: `/index.php/apps/oauth2/authorize`
-* Access Token URL: `/index.php/apps/oauth2/api/v1/token`
+- OAuth 2.0 authorization-code flow with optional PKCE (S256 / plain)
+- Implicit (token) flow for legacy clients
+- Refresh-token rotation, with one-week post-expiry retention before cleanup
+- Trusted clients can skip the consent screen
+- Subdomain wildcards on redirect URIs (opt-in per client)
+- Per-user revocation from personal settings
+- OCC commands for headless administration
+- OpenID Connect `/userinfo` endpoint (sub, name, email, picture)
 
-### Protocol Flow
-1. [Client registration](https://tools.ietf.org/html/rfc6749#section-2): First the clients have to be registered in the admin settings: `/index.php/settings/admin?sectionid=additional#oauth2`. You need to specify a name for the client (the name is unrelated to the OAuth 2.0 protocol and is just used to recognize it later) and the redirection URI. A client identifier and client secret is being generated when adding a new client. They both consist of 64 characters.
+## Requirements
 
-2. [Authorization Request](https://tools.ietf.org/html/rfc6749#section-4.1.1): For every registered client an Authorization Request can be made. The client redirects the resource owner to the [Authorization URL](#endpoints) and requests authorization. The following URL parameters have to be specified: 
-    1. `response_type` (required): needs to be `code` because at this time only the Authorization Code Flow is implemented.
-    2. `client_id` (required): the client identifier obtained when registering the client.
-    3. `redirect_uri` (required): the redirection URI specified when registering the client.
-    4. `state` (optional): can be set by the client "to maintain state between the request and callback" ([RFC 6749](https://tools.ietf.org/html/rfc6749#section-4.1.1)).
-    5. `user` (optional): can be set to indicate the username of the resource owner 
+| Component | Version            |
+| --------- | ------------------ |
+| PHP       | **>= 8.4**         |
+| ownCloud  | 11.x (owncloud.online) |
+| Database  | MySQL, MariaDB, PostgreSQL, Oracle, or SQLite |
 
-3. [Authorization Response](https://tools.ietf.org/html/rfc6749#section-4.1.2): After the resource owner's authorization the app redirects to the `redirect_uri` specified in the Authorization Request and adds the Authorization Code as URL parameter `code`. An Authorization Code is valid for 10 minutes.
+PHP extensions: `gmp`, `intl`, `mbstring` (transitively required by `rowbot/url`).
 
-4. [Access Token Request](https://tools.ietf.org/html/rfc6749#section-4.1.3): With the Authorization Code the client can request an Access Token using the [Access Token URL](#endpoints). [Client Authentication](https://tools.ietf.org/html/rfc6749#section-2.3) is done using Basic Auth with the client identifier as username and the client secret as password. The following URL parameters have to be specified:
-    1. `grant_type `: Either `authorization_code` or `refresh_token`.
-    2. `code` and `redirect_uri` (if the grant type `authorization_code` is used).
-    3. `refresh_token` (if the grant type `refresh_token` is used).
+## Installation
 
-5. [Access Token Response](https://tools.ietf.org/html/rfc6749#section-4.1.4): The app responses to a valid Access Token Request with an JSON response like the following. An Access Token is valid for 1 hour and can be refreshed with a Refresh Token.
-
-```json
-{
-    "access_token" : "1vtnuo1NkIsbndAjVnhl7y0wJha59JyaAiFIVQDvcBY2uvKmj5EPBEhss0pauzdQ",
-    "token_type" : "Bearer",
-    "expires_in" : 3600,
-    "refresh_token" : "7y0wJuvKmj5E1vjVnhlPBEhha59JyaAiFIVQDvcBY2ss0pauzdQtnuo1NkIsbndA",
-    "user_id" : "admin",
-    "message_url" : "https://www.example.org/owncloud/index.php/apps/oauth2/authorization-successful"
-}
+```bash
+cd /var/www/owncloud/apps
+git clone https://github.com/BWTECH-github/owncloud.online.git oauth2
+cd oauth2
+composer install --no-dev
+chown -R www-data:www-data .
+sudo -u www-data php ../../occ app:enable oauth2
 ```
 
-## Limitations
-Since no user passwords are handled by the app at all only master key encryption is working (similiar to the Shibboleth app).
+After enabling, the app's database tables are created automatically via migrations on the next ownCloud request or via `sudo -u www-data php occ upgrade`.
 
-## Possible improvements
-- [ ] Add option for using different [scopes](https://tools.ietf.org/html/rfc6749#section-3.3).
+## Configuration
+
+OAuth2 has no app-specific `config.php` keys — clients are managed entirely through the admin UI or OCC commands. The two settings below influence its behavior indirectly:
+
+```php
+// config/config.php
+'token_auth_enforced' => true,    // require app passwords / tokens for sync clients
+'overwrite.cli.url'   => 'https://cloud.example.com',  // canonical URL used in message_url
+```
+
+Endpoints (relative to the ownCloud base URL):
+
+| Purpose             | URL                                  | Method    |
+| ------------------- | ------------------------------------ | --------- |
+| Authorization       | `/index.php/apps/oauth2/authorize`   | GET, POST |
+| Token               | `/index.php/apps/oauth2/api/v1/token`| POST      |
+| OIDC UserInfo       | `/index.php/apps/oauth2/api/v1/userinfo` | GET   |
+| Authorize success   | `/index.php/apps/oauth2/authorization-successful` | GET |
+
+## OCC Commands
+
+Run from the ownCloud root with the web user, e.g. `sudo -u www-data php occ <command>`.
+
+### `oauth2:add-client`
+
+| Argument            | Required | Description |
+| ------------------- | :------: | ----------- |
+| `name`              | yes      | Display name shown on the consent screen |
+| `client-id`         | yes      | Client identifier (>= 32 chars) |
+| `client-secret`     | yes      | Client secret (>= 32 chars) |
+| `redirect-url`      | yes      | Redirect URI; `http://localhost:*` allows any port |
+| `allow-sub-domains` | no       | `true` / `false` (default `false`) |
+| `trusted`           | no       | `true` / `false` — skip consent screen (default `false`) |
+| `force-trust`       | no       | `true` / `false` — allow trusting `localhost` / `127.0.0.1` |
+
+### `oauth2:list-clients`
+
+Lists all registered clients with their secrets. Supports `--output=json` / `--output=plain`.
+
+### `oauth2:modify-client`
+
+| Argument | Required | Description |
+| -------- | :------: | ----------- |
+| `name`   | yes      | Existing client name (lookup key) |
+| `key`    | yes      | One of: `name`, `client-id`, `client-secret`, `redirect-url`, `allow-sub-domains`, `trusted` |
+| `value`  | yes      | New value (validated per key) |
+
+### `oauth2:remove-client`
+
+| Argument    | Required | Description |
+| ----------- | :------: | ----------- |
+| `client-id` | yes      | The client identifier to delete |
+
+## Daily Usage
+
+### Register a desktop client
+
+```bash
+sudo -u www-data php occ oauth2:add-client \
+  "Desktop Client" \
+  "$(openssl rand -hex 32)" \
+  "$(openssl rand -hex 32)" \
+  "http://localhost:*"
+```
+
+### Authorization-code flow (with PKCE)
+
+```
+GET /index.php/apps/oauth2/authorize
+  ?response_type=code
+  &client_id=<id>
+  &redirect_uri=<uri>
+  &state=<random>
+  &code_challenge=<base64url(sha256(verifier))>
+  &code_challenge_method=S256
+```
+
+Exchange the returned `code` for tokens:
+
+```
+POST /index.php/apps/oauth2/api/v1/token
+Authorization: Basic base64(client_id:client_secret)
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=authorization_code
+&code=<code>
+&redirect_uri=<uri>
+&code_verifier=<verifier>
+```
+
+Public clients (no secret) authenticate the token request via PKCE:
+
+```
+grant_type=authorization_code&code=<code>&redirect_uri=<uri>
+&client_id=<id>&code_verifier=<verifier>
+```
+
+### Refresh
+
+```
+POST /index.php/apps/oauth2/api/v1/token
+grant_type=refresh_token&refresh_token=<refresh_token>
+```
+
+Access tokens expire after one hour (`AccessToken::EXPIRATION_TIME = 3600`); authorization codes after 10 minutes (`AuthorizationCode::EXPIRATION_TIME = 600`).
+
+## Troubleshooting
+
+| Symptom                                                              | Likely cause / Fix |
+| -------------------------------------------------------------------- | ------------------ |
+| `invalid_client` on token endpoint                                   | Wrong client id/secret, or `PHP_AUTH_USER` not forwarded by your reverse proxy. Ensure Apache `SetEnvIf Authorization` / nginx `proxy_set_header Authorization` is in place. |
+| `invalid_grant: auth grant redirect uri invalid`                     | The `redirect_uri` in the token request does not match the registered one — protocol, port, host, path, and query must match. |
+| `invalid_grant: code verifier invalid`                               | PKCE verifier doesn't match the challenge. Re-check `S256` encoding (`base64url(sha256(verifier))`, no padding). |
+| Desktop client 2.4.2 stuck in refresh loop                           | Known interop bug; the app already returns HTTP 200 on refresh failure for `mirall/2.4.2` to break the loop. Update the client. |
+| Bearer token rejected on WebDAV after IDP migration                  | `OAuth2Test`-shaped session leak; clear the user's session cookies and retry. |
+| `Cannot set localhost as trusted`                                    | Use `--trusted=true --force-trust=true` if you really need a trusted localhost client (testing only). |
+| File encryption with OAuth2-authenticated sessions fails             | Only **master-key** encryption is supported — user-key encryption needs the password, which OAuth2 never sees. |
+| Tokens not cleaned up                                                | `oauth2:cleanup` runs daily as a `TimedJob`. Check `oc_jobs`; if cron is broken, expired tokens accumulate (still rejected, just not deleted). |
+
+## Attribution
+
+This is a fork of [owncloud/oauth2](https://github.com/owncloud/oauth2), originally developed by Project Seminar "sciebo@Learnweb" of the University of Münster and ownCloud GmbH. Modifications for PHP 8.4 and owncloud.online by BW-Tech GmbH. Licensed under AGPL-3.0; see [COPYING](COPYING).
