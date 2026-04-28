@@ -1,7 +1,8 @@
 <?php
 /**
  * @author Project Seminar "sciebo@Learnweb" of the University of Muenster
- * @copyright Copyright (c) 2017, University of Muenster
+ * @copyright Copyright (c) 2017, University of Muenster, ownCloud GmbH
+ * Modified by BW-Tech GmbH for owncloud.online (PHP 8.4).
  * @license AGPL-3.0
  *
  * This code is free software: you can redistribute it and/or modify
@@ -40,54 +41,18 @@ use OCP\IUserSession;
 use OCP\Util;
 
 class PageController extends Controller {
-	/** @var ClientMapper */
-	private $clientMapper;
-	/** @var AuthorizationCodeMapper */
-	private $authorizationCodeMapper;
-	/** @var AccessTokenMapper */
-	private $accessTokenMapper;
-	/** @var ILogger */
-	private $logger;
-	/** @var IURLGenerator */
-	private $urlGenerator;
-	/** @var IUserSession */
-	private $userSession;
-	/** @var IUserManager */
-	private $userManager;
-
-	/**
-	 * PageController constructor.
-	 *
-	 * @param string $appName The app's name.
-	 * @param IRequest $request The request.
-	 * @param ClientMapper $clientMapper The client mapper.
-	 * @param AuthorizationCodeMapper $authorizationCodeMapper The authorization code mapper.
-	 * @param AccessTokenMapper $accessTokenMapper The access token mapper.
-	 * @param ILogger $logger The logger.
-	 * @param IURLGenerator $urlGenerator
-	 * @param IUserSession $userSession
-	 * @param IUserManager $userManager
-	 */
 	public function __construct(
 		string $appName,
 		IRequest $request,
-		ClientMapper $clientMapper,
-		AuthorizationCodeMapper $authorizationCodeMapper,
-		AccessTokenMapper $accessTokenMapper,
-		ILogger $logger,
-		IURLGenerator $urlGenerator,
-		IUserSession $userSession,
-		IUserManager $userManager
+		private readonly ClientMapper $clientMapper,
+		private readonly AuthorizationCodeMapper $authorizationCodeMapper,
+		private readonly AccessTokenMapper $accessTokenMapper,
+		private readonly ILogger $logger,
+		private readonly IURLGenerator $urlGenerator,
+		private readonly IUserSession $userSession,
+		private readonly IUserManager $userManager
 	) {
 		parent::__construct($appName, $request);
-
-		$this->clientMapper = $clientMapper;
-		$this->authorizationCodeMapper = $authorizationCodeMapper;
-		$this->accessTokenMapper = $accessTokenMapper;
-		$this->logger = $logger;
-		$this->urlGenerator = $urlGenerator;
-		$this->userSession = $userSession;
-		$this->userManager = $userManager;
 	}
 
 	/**
@@ -158,7 +123,7 @@ class PageController extends Controller {
 		try {
 			/** @var \OCA\OAuth2\Db\Client $client */
 			$client = $this->clientMapper->findByIdentifier($client_id);
-		} catch (DoesNotExistException $exception) {
+		} catch (DoesNotExistException) {
 			$this->logger->error("Invalid OAuth request with client-id $client_id");
 			return new TemplateResponse(
 				$this->appName,
@@ -241,14 +206,14 @@ class PageController extends Controller {
 			return new RedirectResponse(OC_Util::getDefaultPageUrl());
 		}
 
-		$userUID  = $this->userSession->getUser()->getUID();
+		$userUID = $this->userSession->getUser()->getUID();
 
 		switch ($response_type) {
 			case 'code':
 				try {
 					/** @var \OCA\OAuth2\Db\Client $client */
 					$client = $this->clientMapper->findByIdentifier($client_id);
-				} catch (DoesNotExistException $exception) {
+				} catch (DoesNotExistException) {
 					return new RedirectResponse(OC_Util::getDefaultPageUrl());
 				}
 
@@ -279,7 +244,7 @@ class PageController extends Controller {
 				try {
 					/** @var \OCA\OAuth2\Db\Client $client */
 					$client = $this->clientMapper->findByIdentifier($client_id);
-				} catch (DoesNotExistException $exception) {
+				} catch (DoesNotExistException) {
 					return new RedirectResponse(OC_Util::getDefaultPageUrl());
 				}
 
@@ -318,7 +283,7 @@ class PageController extends Controller {
 	 * @NoAdminRequired
 	 * @NoCSRFRequired
 	 */
-	public function authorizationSuccessful() {
+	public function authorizationSuccessful(): TemplateResponse {
 		return new TemplateResponse($this->appName, 'authorization-successful', [], 'guest');
 	}
 
@@ -367,11 +332,7 @@ class PageController extends Controller {
 
 		// look up username so we can fill the login field for the end user
 		$userObj = $this->userManager->get($user);
-		if ($userObj !== null) {
-			$loginHint = $userObj->getUserName();
-		} else {
-			$loginHint = $user;
-		}
+		$loginHint = $userObj?->getUserName() ?? $user;
 
 		// redirect the browser to the login page and set the redirect_url to the authorize page of oauth2
 		return new RedirectResponse($this->urlGenerator->linkToRouteAbsolute(
@@ -385,9 +346,8 @@ class PageController extends Controller {
 
 	/**
 	 * @param IUser|string $userIdOrUser
-	 * @return string
 	 */
-	private function buildDisplayForUser($userIdOrUser) {
+	private function buildDisplayForUser($userIdOrUser): string {
 		$currentUser = $userIdOrUser;
 		if (!$userIdOrUser instanceof IUser) {
 			$currentUser = $this->userManager->get($userIdOrUser);
@@ -407,11 +367,7 @@ class PageController extends Controller {
 		return "<span class='hasTooltip' data-original-title='$userId'><strong>$escapedDisplayName</strong></span>";
 	}
 
-	/**
-	 * @param string $userId
-	 * @return bool
-	 */
-	private function isDifferentUser($userId) {
+	private function isDifferentUser($userId): bool {
 		if (empty($userId)) {
 			return false;
 		}

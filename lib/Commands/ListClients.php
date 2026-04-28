@@ -4,6 +4,7 @@
  * @author Jannik Stehle <jstehle@owncloud.com>
  *
  * @copyright Copyright (c) 2021, ownCloud GmbH
+ * Modified by BW-Tech GmbH for owncloud.online (PHP 8.4).
  * @license AGPL-3.0
  *
  * This code is free software: you can redistribute it and/or modify
@@ -28,16 +29,12 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
 class ListClients extends Base {
-	/** @var ClientMapper */
-	private $clientMapper;
-
-	public function __construct(ClientMapper $clientMapper) {
+	public function __construct(private readonly ClientMapper $clientMapper) {
 		parent::__construct();
-
-		$this->clientMapper = $clientMapper;
 	}
 
-	protected function configure() {
+	#[\Override]
+	protected function configure(): void {
 		parent::configure();
 		$this
 			->setName('oauth2:list-clients')
@@ -45,16 +42,14 @@ class ListClients extends Base {
 	}
 
 	/**
-	 * @param InputInterface $input
-	 * @param OutputInterface $output
-	 * @return int
 	 * @throws \OCP\AppFramework\Db\MultipleObjectsReturnedException
 	 */
+	#[\Override]
 	protected function execute(InputInterface $input, OutputInterface $output): int {
-		$clients  = $this->clientMapper->findAll();
+		$clients = $this->clientMapper->findAll();
 		$clientsOutput = [];
 
-		/** @var  \OCA\OAuth2\Db\Client  $client */
+		/** @var \OCA\OAuth2\Db\Client $client */
 		foreach ($clients as $client) {
 			$clientsOutput[$client->getName()] = [
 				'name' => $client->getName(),

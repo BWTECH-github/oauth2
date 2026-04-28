@@ -1,7 +1,8 @@
 <?php
 /**
  * @author Project Seminar "sciebo@Learnweb" of the University of Muenster
- * @copyright Copyright (c) 2017, University of Muenster
+ * @copyright Copyright (c) 2017, University of Muenster, ownCloud GmbH
+ * Modified by BW-Tech GmbH for owncloud.online (PHP 8.4).
  * @license AGPL-3.0
  *
  * This code is free software: you can redistribute it and/or modify
@@ -20,6 +21,7 @@
 namespace OCA\OAuth2\Db;
 
 use Doctrine\DBAL\Platforms\OraclePlatform;
+use OC;
 use OCP\AppFramework\Db\Entity;
 
 /**
@@ -35,16 +37,13 @@ use OCP\AppFramework\Db\Entity;
  * @method boolean getTrusted()
  */
 class Client extends Entity {
-	protected $identifier;
-	protected $secret;
-	protected $redirectUri;
-	protected $name;
-	protected $allowSubdomains;
-	protected $trusted;
+	protected ?string $identifier = null;
+	protected ?string $secret = null;
+	protected ?string $redirectUri = null;
+	protected ?string $name = null;
+	protected ?bool $allowSubdomains = null;
+	protected ?bool $trusted = null;
 
-	/**
-	 * Client constructor.
-	 */
 	public function __construct() {
 		$this->addType('id', 'int');
 		$this->addType('identifier', 'string');
@@ -56,7 +55,7 @@ class Client extends Entity {
 	}
 
 	public function setAllowSubdomains(bool $value): void {
-		if (\OC::$server->getDatabaseConnection()->getDatabasePlatform() instanceof OraclePlatform) {
+		if (OC::$server->getDatabaseConnection()->getDatabasePlatform() instanceof OraclePlatform) {
 			$this->setter('allowSubdomains', [$value ? 1 : 0]);
 		} else {
 			$this->setter('allowSubdomains', [$value]);
@@ -64,7 +63,7 @@ class Client extends Entity {
 	}
 
 	public function setTrusted(bool $value): void {
-		if (\OC::$server->getDatabaseConnection()->getDatabasePlatform() instanceof OraclePlatform) {
+		if (OC::$server->getDatabaseConnection()->getDatabasePlatform() instanceof OraclePlatform) {
 			$this->setter('trusted', [$value ? 1 : 0]);
 		} else {
 			$this->setter('trusted', [$value]);

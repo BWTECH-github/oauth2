@@ -1,7 +1,8 @@
 <?php
 /**
  * @author Project Seminar "sciebo@Learnweb" of the University of Muenster
- * @copyright Copyright (c) 2017, University of Muenster
+ * @copyright Copyright (c) 2017, University of Muenster, ownCloud GmbH
+ * Modified by BW-Tech GmbH for owncloud.online (PHP 8.4).
  * @license AGPL-3.0
  *
  * This code is free software: you can redistribute it and/or modify
@@ -21,17 +22,16 @@ namespace OCA\OAuth2;
 
 require_once __DIR__ . '/../vendor/autoload.php';
 
+use OC;
 use Rowbot\URL\Exception\TypeError;
 use Rowbot\URL\URL;
 
 class Utilities {
 	/**
 	 * Generates a random string with 64 characters.
-	 *
-	 * @return string The random string.
 	 */
 	public static function generateRandom(): string {
-		return \OC::$server->getSecureRandom()->generate(
+		return OC::$server->getSecureRandom()->generate(
 			64,
 			'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
 		);
@@ -39,14 +39,8 @@ class Utilities {
 
 	/**
 	 * Validates a redirection URI.
-	 *
-	 * @param string $expected The expected redirection URI.
-	 * @param string $actual The actual redirection URI.
-	 * @param boolean $allowSubdomains Whether to allow subdomains.
-	 *
-	 * @return boolean True if the redirection URI is valid, false otherwise.
 	 */
-	public static function validateRedirectUri($expected, $actual, $allowSubdomains): bool {
+	public static function validateRedirectUri(string $expected, string $actual, bool $allowSubdomains): bool {
 		$validatePort = true;
 		if (\strpos($expected, 'http://localhost:*') === 0) {
 			$expected = 'http://localhost' . \substr($expected, 18);
@@ -76,25 +70,25 @@ class Utilities {
 			}
 
 			return true;
-		} catch (TypeError $ex) {
+		} catch (TypeError) {
 			return false;
 		}
 	}
 
-	public static function removeWildcardPort($redirectUri): string {
+	public static function removeWildcardPort(string $redirectUri): string {
 		if (\strpos($redirectUri, 'http://localhost:*') === 0) {
 			$redirectUri = 'http://localhost' . \substr($redirectUri, 18);
 		}
 		return $redirectUri;
 	}
 
-	public static function isValidUrl($redirectUri): bool {
+	public static function isValidUrl(string $redirectUri): bool {
 		$redirectUri = self::removeWildcardPort($redirectUri);
-		return (\filter_var($redirectUri, FILTER_VALIDATE_URL) !== false);
+		return \filter_var($redirectUri, FILTER_VALIDATE_URL) !== false;
 	}
 
 	// See https://tools.ietf.org/pdf/rfc7636.pdf#56
-	public static function base64url_encode($data): string {
+	public static function base64url_encode(string $data): string {
 		return \rtrim(\strtr(\base64_encode($data), '+/', '-_'), '=');
 	}
 
@@ -103,8 +97,8 @@ class Utilities {
 			return \strcmp($expectedUrl->hostname, $actualUrl->hostname) === 0;
 		}
 
-		$expectedUrlParts = array_reverse(explode('.', $expectedUrl->hostname));
-		$actualUrlParts = array_reverse(explode('.', $actualUrl->hostname));
+		$expectedUrlParts = \array_reverse(\explode('.', $expectedUrl->hostname));
+		$actualUrlParts = \array_reverse(\explode('.', $actualUrl->hostname));
 		foreach ($expectedUrlParts as $i => $p) {
 			if ($p !== $actualUrlParts[$i]) {
 				return false;

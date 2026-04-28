@@ -1,7 +1,8 @@
 <?php
 /**
  * @author Project Seminar "sciebo@Learnweb" of the University of Muenster
- * @copyright Copyright (c) 2017, University of Muenster
+ * @copyright Copyright (c) 2017, University of Muenster, ownCloud GmbH
+ * Modified by BW-Tech GmbH for owncloud.online (PHP 8.4).
  * @license AGPL-3.0
  *
  * This code is free software: you can redistribute it and/or modify
@@ -32,10 +33,10 @@ use OCP\AppFramework\Db\Entity;
  * @method void setAccessTokenId(int $accessTokenId)
  */
 class RefreshToken extends Entity {
-	protected $token;
-	protected $clientId;
-	protected $userId;
-	protected $accessTokenId;
+	protected ?string $token = null;
+	protected ?int $clientId = null;
+	protected ?string $userId = null;
+	protected ?int $accessTokenId = null;
 
 	public function __construct() {
 		$this->addType('id', 'int');

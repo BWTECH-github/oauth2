@@ -1,7 +1,8 @@
 <?php
 /**
  * @author Project Seminar "sciebo@Learnweb" of the University of Muenster
- * @copyright Copyright (c) 2017, University of Muenster
+ * @copyright Copyright (c) 2017, University of Muenster, ownCloud GmbH
+ * Modified by BW-Tech GmbH for owncloud.online (PHP 8.4).
  * @license AGPL-3.0
  *
  * This code is free software: you can redistribute it and/or modify
@@ -25,11 +26,6 @@ use OCP\AppFramework\Db\Mapper;
 use OCP\IDb;
 
 class ClientMapper extends Mapper {
-	/**
-	 * ClientMapper constructor.
-	 *
-	 * @param IDb $db Database Connection.
-	 */
 	public function __construct(IDb $db) {
 		parent::__construct($db, 'oauth2_clients');
 	}
@@ -37,15 +33,10 @@ class ClientMapper extends Mapper {
 	/**
 	 * Selects a client by its ID.
 	 *
-	 * @param int $id The client's ID.
-	 *
-	 * @return Entity The client entity.
-	 *
 	 * @throws \OCP\AppFramework\Db\DoesNotExistException if not found.
-	 * @throws \OCP\AppFramework\Db\MultipleObjectsReturnedException if more
-	 * than one result.
+	 * @throws \OCP\AppFramework\Db\MultipleObjectsReturnedException if more than one result.
 	 */
-	public function find($id) {
+	public function find($id): Entity {
 		if (!\is_int($id)) {
 			throw new InvalidArgumentException('id must not be null');
 		}
@@ -57,15 +48,10 @@ class ClientMapper extends Mapper {
 	/**
 	 * Selects a client by its identifier.
 	 *
-	 * @param string $identifier The client's identifier.
-	 *
-	 * @return Entity The client entity.
-	 *
 	 * @throws \OCP\AppFramework\Db\DoesNotExistException if not found.
-	 * @throws \OCP\AppFramework\Db\MultipleObjectsReturnedException if more
-	 * than one result.
+	 * @throws \OCP\AppFramework\Db\MultipleObjectsReturnedException if more than one result.
 	 */
-	public function findByIdentifier($identifier) {
+	public function findByIdentifier($identifier): Entity {
 		if (!\is_string($identifier)) {
 			throw new InvalidArgumentException('identifier must not be null');
 		}
@@ -74,7 +60,7 @@ class ClientMapper extends Mapper {
 		return $this->findEntity($sql, [$identifier], null, null);
 	}
 
-	public function findByName($name) {
+	public function findByName($name): Entity {
 		if (!\is_string($name)) {
 			throw new InvalidArgumentException('name must not be null');
 		}
@@ -84,24 +70,16 @@ class ClientMapper extends Mapper {
 
 	/**
 	 * Selects all clients.
-	 *
-	 * @param int $limit The maximum number of rows.
-	 * @param int $offset From which row we want to start.
-	 * @return array All clients.
 	 */
-	public function findAll($limit = null, $offset = null) {
+	public function findAll($limit = null, $offset = null): array {
 		$sql = 'SELECT * FROM `' . $this->tableName . '`';
 		return $this->findEntities($sql, [], $limit, $offset);
 	}
 
 	/**
 	 * Selects clients by the given user ID.
-	 *
-	 * @param string $userId The user ID.
-	 *
-	 * @return array The client entities.
 	 */
-	public function findByUser($userId) {
+	public function findByUser($userId): array {
 		if (!\is_string($userId)) {
 			throw new InvalidArgumentException('userId must not be null');
 		}
@@ -118,8 +96,8 @@ class ClientMapper extends Mapper {
 	/**
 	 * Deletes all entities in the table.
 	 */
-	public function deleteAll() {
+	public function deleteAll(): void {
 		$sql = 'DELETE FROM `' . $this->tableName . '`';
-		$stmt = $this->executeStatement($sql, []);
+		$this->executeStatement($sql, []);
 	}
 }

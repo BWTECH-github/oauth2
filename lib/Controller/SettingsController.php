@@ -1,7 +1,8 @@
 <?php
 /**
  * @author Project Seminar "sciebo@Learnweb" of the University of Muenster
- * @copyright Copyright (c) 2017, University of Muenster
+ * @copyright Copyright (c) 2017, University of Muenster, ownCloud GmbH
+ * Modified by BW-Tech GmbH for owncloud.online (PHP 8.4).
  * @license AGPL-3.0
  *
  * This code is free software: you can redistribute it and/or modify
@@ -38,65 +39,19 @@ use OCP\Template;
 use Rowbot\URL\URL;
 
 class SettingsController extends Controller {
-	/** @var ClientMapper */
-	private $clientMapper;
-
-	/** @var AuthorizationCodeMapper */
-	private $authorizationCodeMapper;
-
-	/** @var AccessTokenMapper */
-	private $accessTokenMapper;
-
-	/** @var RefreshTokenMapper */
-	private $refreshTokenMapper;
-
-	/** @var string */
-	private $userId;
-
-	/** @var IL10N  */
-	private $l10n;
-
-	/** @var ILogger */
-	private $logger;
-
-	/** @var IURLGenerator */
-	private $urlGenerator;
-
-	/**
-	 * SettingsController constructor.
-	 *
-	 * @param string $AppName The app's name.
-	 * @param IRequest $request The request.
-	 * @param ClientMapper $clientMapper The client mapper.
-	 * @param AuthorizationCodeMapper $authorizationCodeMapper The authorization code mapper.
-	 * @param AccessTokenMapper $accessTokenMapper The access token mapper.
-	 * @param RefreshTokenMapper $refreshTokenMapper The refresh token mapper.
-	 * @param string $UserId The user ID.
-	 * @param ILogger $logger The logger.
-	 * @param IURLGenerator $urlGenerator Use for url generation
-	 */
 	public function __construct(
 		$AppName,
 		IRequest $request,
-		ClientMapper $clientMapper,
-		AuthorizationCodeMapper $authorizationCodeMapper,
-		AccessTokenMapper $accessTokenMapper,
-		RefreshTokenMapper $refreshTokenMapper,
-		$UserId,
-		IL10N $l10n,
-		ILogger $logger,
-		IURLGenerator $urlGenerator
+		private readonly ClientMapper $clientMapper,
+		private readonly AuthorizationCodeMapper $authorizationCodeMapper,
+		private readonly AccessTokenMapper $accessTokenMapper,
+		private readonly RefreshTokenMapper $refreshTokenMapper,
+		private readonly string $UserId,
+		private readonly IL10N $l10n,
+		private readonly ILogger $logger,
+		private readonly IURLGenerator $urlGenerator
 	) {
 		parent::__construct($AppName, $request);
-
-		$this->clientMapper = $clientMapper;
-		$this->authorizationCodeMapper = $authorizationCodeMapper;
-		$this->accessTokenMapper = $accessTokenMapper;
-		$this->refreshTokenMapper = $refreshTokenMapper;
-		$this->userId = $UserId;
-		$this->l10n = $l10n;
-		$this->logger = $logger;
-		$this->urlGenerator = $urlGenerator;
 	}
 
 	public function addClient(): JSONResponse {
@@ -116,7 +71,7 @@ class SettingsController extends Controller {
 			// The name should be unique
 			$this->clientMapper->findByName($name);
 			return $this->sendErrorResponse($this->l10n->t('Name %s already exists', [$name]));
-		} catch (DoesNotExistException $e) {
+		} catch (DoesNotExistException) {
 			// expected when the client name is not a duplicate
 		}
 
@@ -145,7 +100,7 @@ class SettingsController extends Controller {
 		return new JSONResponse(
 			[
 				'status' => 'success',
-				'rowHtml' =>  $template->fetchPage(),
+				'rowHtml' => $template->fetchPage(),
 				'data' => [] // OC.msg needs this
 			]
 		);
@@ -154,9 +109,6 @@ class SettingsController extends Controller {
 	/**
 	 * Deletes a client.
 	 *
-	 * @param int $id The client identifier.
-	 *
-	 * @return JSONResponse
 	 * @throws DoesNotExistException
 	 * @throws MultipleObjectsReturnedException
 	 */
@@ -177,7 +129,7 @@ class SettingsController extends Controller {
 		return new JSONResponse(
 			[
 				'status' => 'success',
-				'clientIdentifier' =>  $client->getIdentifier(),
+				'clientIdentifier' => $client->getIdentifier(),
 				'data' => [] // OC.msg needs this
 			]
 		);
@@ -186,13 +138,9 @@ class SettingsController extends Controller {
 	/**
 	 * Revokes the authorization for a client.
 	 *
-	 * @param int $id The client identifier.
-	 *
-	 * @return RedirectResponse Redirection to the settings page.
-	 *
 	 * @NoAdminRequired
 	 */
-	public function revokeAuthorization($id) {
+	public function revokeAuthorization($id): RedirectResponse {
 		if (!\is_int($id)) {
 			return new RedirectResponse(
 				$this->urlGenerator->linkToRouteAbsolute(
@@ -202,9 +150,9 @@ class SettingsController extends Controller {
 			);
 		}
 
-		$this->authorizationCodeMapper->deleteByClientUser($id, $this->userId);
-		$this->accessTokenMapper->deleteByClientUser($id, $this->userId);
-		$this->refreshTokenMapper->deleteByClientUser($id, $this->userId);
+		$this->authorizationCodeMapper->deleteByClientUser($id, $this->UserId);
+		$this->accessTokenMapper->deleteByClientUser($id, $this->UserId);
+		$this->refreshTokenMapper->deleteByClientUser($id, $this->UserId);
 
 		return new RedirectResponse(
 			$this->urlGenerator->linkToRouteAbsolute(

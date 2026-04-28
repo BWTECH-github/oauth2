@@ -1,7 +1,8 @@
 <?php
 /**
  * @author Project Seminar "sciebo@Learnweb" of the University of Muenster
- * @copyright Copyright (c) 2017, University of Muenster
+ * @copyright Copyright (c) 2017, University of Muenster, ownCloud GmbH
+ * Modified by BW-Tech GmbH for owncloud.online (PHP 8.4).
  * @license AGPL-3.0
  *
  * This code is free software: you can redistribute it and/or modify
@@ -25,32 +26,23 @@ use OCA\OAuth2\Db\AuthorizationCodeMapper;
 
 class CleanUp extends TimedJob {
 	/**
-	 * @var AccessTokenMapper
-	 */
-	protected $accessTokenMapper;
-	/**
-	 * @var AuthorizationCodeMapper
-	 */
-	protected $authorizationCodeMapper;
-
-	/**
 	 * Cron interval in seconds
 	 */
 	protected $interval = 86400;
 
 	public function __construct(
-		AuthorizationCodeMapper $authorizationCodeMapper,
-		AccessTokenMapper $accessTokenMapper
+		protected AuthorizationCodeMapper $authorizationCodeMapper,
+		protected AccessTokenMapper $accessTokenMapper
 	) {
-		$this->authorizationCodeMapper = $authorizationCodeMapper;
-		$this->accessTokenMapper = $accessTokenMapper;
 	}
 
 	/**
 	 * Cleans up expired authorization codes and access tokens.
+	 *
 	 * @param string $argument
 	 */
-	public function run($argument) {
+	#[\Override]
+	public function run($argument): void {
 		$this->authorizationCodeMapper->cleanUp();
 		$this->accessTokenMapper->cleanUp();
 	}

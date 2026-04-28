@@ -1,7 +1,8 @@
 <?php
 /**
  * @author Project Seminar "sciebo@Learnweb" of the University of Muenster
- * @copyright Copyright (c) 2017, University of Muenster
+ * @copyright Copyright (c) 2017, University of Muenster, ownCloud GmbH
+ * Modified by BW-Tech GmbH for owncloud.online (PHP 8.4).
  * @license AGPL-3.0
  *
  * This code is free software: you can redistribute it and/or modify
@@ -26,38 +27,20 @@ use OCP\Settings\ISettings;
 use OCP\Template;
 
 class PersonalPanel implements ISettings {
-	/**
-	 * @var \OCA\OAuth2\Db\ClientMapper
-	 */
-	protected $clientMapper;
-	/**
-	 * @var IUserSession
-	 */
-	protected $userSession;
-
-	/**
-	 * @var IURLGenerator
-	 */
-	protected $urlGenerator;
-
 	public function __construct(
-		ClientMapper $clientMapper,
-		IUserSession $userSession,
-		IURLGenerator $urlGenerator
+		protected readonly ClientMapper $clientMapper,
+		protected readonly IUserSession $userSession,
+		protected readonly IURLGenerator $urlGenerator
 	) {
-		$this->clientMapper = $clientMapper;
-		$this->userSession = $userSession;
-		$this->urlGenerator = $urlGenerator;
 	}
 
-	public function getSectionID() {
+	#[\Override]
+	public function getSectionID(): string {
 		return 'security';
 	}
 
-	/**
-	 * @return Template
-	 */
-	public function getPanel() {
+	#[\Override]
+	public function getPanel(): Template {
 		$userId = $this->userSession->getUser()->getUID();
 		$t = new Template('oauth2', 'settings-personal');
 		$t->assign('clients', $this->clientMapper->findByUser($userId));
@@ -67,7 +50,8 @@ class PersonalPanel implements ISettings {
 		return $t;
 	}
 
-	public function getPriority() {
+	#[\Override]
+	public function getPriority(): int {
 		return 20;
 	}
 }

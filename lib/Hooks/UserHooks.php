@@ -1,7 +1,8 @@
 <?php
 /**
  * @author Project Seminar "sciebo@Learnweb" of the University of Muenster
- * @copyright Copyright (c) 2017, University of Muenster
+ * @copyright Copyright (c) 2017, University of Muenster, ownCloud GmbH
+ * Modified by BW-Tech GmbH for owncloud.online (PHP 8.4).
  * @license AGPL-3.0
  *
  * This code is free software: you can redistribute it and/or modify
@@ -20,68 +21,30 @@
 namespace OCA\OAuth2\Hooks;
 
 use OC\User\Manager;
-use OC\User\User;
 use OCA\OAuth2\Db\AccessTokenMapper;
 use OCA\OAuth2\Db\AuthorizationCodeMapper;
 use OCA\OAuth2\Db\RefreshTokenMapper;
 use OCP\ILogger;
 
 class UserHooks {
-	/** @var Manager */
-	private $userManager;
-
-	/** @var AuthorizationCodeMapper */
-	private $authorizationCodeMapper;
-
-	/** @var  AccessTokenMapper */
-	private $accessTokenMapper;
-
-	/** @var RefreshTokenMapper */
-	private $refreshTokenMapper;
-
-	/** @var ILogger */
-	private $logger;
-
-	/** @var string */
-	private $appName;
-
-	/**
-	 * UserHooks constructor.
-	 *
-	 * @param Manager $userManager The user manager.
-	 * @param AuthorizationCodeMapper $authorizationCodeMapper The authorization code mapper.
-	 * @param AccessTokenMapper $accessTokenMapper The access token mapper.
-	 * @param RefreshTokenMapper $refreshTokenMapper The refresh token mapper.
-	 * @param ILogger $logger The logger.
-	 * @param string $AppName The app's name.
-	 */
 	public function __construct(
-		Manager $userManager,
-		AuthorizationCodeMapper $authorizationCodeMapper,
-		AccessTokenMapper $accessTokenMapper,
-		RefreshTokenMapper $refreshTokenMapper,
-		ILogger $logger,
-		$AppName
+		private readonly Manager $userManager,
+		private readonly AuthorizationCodeMapper $authorizationCodeMapper,
+		private readonly AccessTokenMapper $accessTokenMapper,
+		private readonly RefreshTokenMapper $refreshTokenMapper,
+		private readonly ILogger $logger,
+		private readonly string $AppName
 	) {
-		$this->userManager = $userManager;
-		$this->authorizationCodeMapper = $authorizationCodeMapper;
-		$this->accessTokenMapper = $accessTokenMapper;
-		$this->refreshTokenMapper = $refreshTokenMapper;
-		$this->logger = $logger;
-		$this->appName = $AppName;
 	}
 
 	/**
 	 * Registers a pre-delete hook for users to delete authorization codes,
 	 * access tokens and refresh tokens that reference the user.
 	 */
-	public function register() {
-		/**
-		 * @param User $user .
-		 */
-		$callback = function ($user) {
+	public function register(): void {
+		$callback = function ($user): void {
 			if ($user->getUID() !== null) {
-				$this->logger->info('Deleting authorization codes, access tokens and refresh tokens referencing the user to be deleted "' . $user->getUID() . '".', ['app' => $this->appName]);
+				$this->logger->info('Deleting authorization codes, access tokens and refresh tokens referencing the user to be deleted "' . $user->getUID() . '".', ['app' => $this->AppName]);
 
 				$this->authorizationCodeMapper->deleteByUser($user->getUID());
 				$this->accessTokenMapper->deleteByUser($user->getUID());

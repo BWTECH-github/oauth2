@@ -1,7 +1,8 @@
 <?php
 /**
  * @author Project Seminar "sciebo@Learnweb" of the University of Muenster
- * @copyright Copyright (c) 2017, University of Muenster
+ * @copyright Copyright (c) 2017, University of Muenster, ownCloud GmbH
+ * Modified by BW-Tech GmbH for owncloud.online (PHP 8.4).
  * @license AGPL-3.0
  *
  * This code is free software: you can redistribute it and/or modify
@@ -24,29 +25,23 @@ use OCP\Settings\ISettings;
 use OCP\Template;
 
 class AdminPanel implements ISettings {
-	/**
-	 * @var \OCA\OAuth2\Db\ClientMapper
-	 */
-	protected $clientMapper;
-
-	public function __construct(ClientMapper $clientMapper) {
-		$this->clientMapper = $clientMapper;
+	public function __construct(protected readonly ClientMapper $clientMapper) {
 	}
 
-	public function getSectionID() {
+	#[\Override]
+	public function getSectionID(): string {
 		return 'authentication';
 	}
 
-	/**
-	 * @return Template
-	 */
-	public function getPanel() {
+	#[\Override]
+	public function getPanel(): Template {
 		$t = new Template('oauth2', 'settings-admin');
 		$t->assign('clients', $this->clientMapper->findAll());
 		return $t;
 	}
 
-	public function getPriority() {
+	#[\Override]
+	public function getPriority(): int {
 		return 20;
 	}
 }

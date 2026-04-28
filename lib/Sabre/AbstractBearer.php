@@ -1,12 +1,4 @@
 <?php
-
-namespace OCA\OAuth2\Sabre;
-
-use Sabre\DAV\Auth\Backend\BackendInterface;
-use Sabre\HTTP;
-use Sabre\HTTP\RequestInterface;
-use Sabre\HTTP\ResponseInterface;
-
 /**
  * Note: This file was imported from sabre/dav 3.2. It was necessary to import
  * it in order to add compatibility with ownCloud 9.1, where an older version of
@@ -19,21 +11,28 @@ use Sabre\HTTP\ResponseInterface;
  * the validateBearerToken method.
  *
  * @copyright Copyright (C) 2007-2015 fruux GmbH (https://fruux.com/).
+ * Modified by BW-Tech GmbH for owncloud.online (PHP 8.4).
  * @author François Kooman (https://tuxed.net/)
  * @author James David Low (http://jameslow.com/)
  * @author Evert Pot (http://evertpot.com/)
  * @license http://sabre.io/license/ Modified BSD License
  */
+
+namespace OCA\OAuth2\Sabre;
+
+use Sabre\DAV\Auth\Backend\BackendInterface;
+use Sabre\HTTP;
+use Sabre\HTTP\RequestInterface;
+use Sabre\HTTP\ResponseInterface;
+
 abstract class AbstractBearer implements BackendInterface {
 	/**
 	 * Authentication Realm.
 	 *
 	 * The realm is often displayed by browser clients when showing the
 	 * authentication dialog.
-	 *
-	 * @var string
 	 */
-	protected $realm = 'sabre/dav';
+	protected string $realm = 'sabre/dav';
 
 	/**
 	 * Validates a Bearer token
@@ -41,18 +40,14 @@ abstract class AbstractBearer implements BackendInterface {
 	 * This method should return the full principal url, or false if the
 	 * token was incorrect.
 	 *
-	 * @param string $bearerToken
 	 * @return string|false
 	 */
 	abstract protected function validateBearerToken($bearerToken);
 
 	/**
 	 * Sets the authentication realm for this backend.
-	 *
-	 * @param string $realm
-	 * @return void
 	 */
-	public function setRealm($realm) {
+	public function setRealm(string $realm): void {
 		$this->realm = $realm;
 	}
 
@@ -79,12 +74,9 @@ abstract class AbstractBearer implements BackendInterface {
 	 * return a string such as:
 	 *
 	 * principals/users/[username]
-	 *
-	 * @param RequestInterface $request
-	 * @param ResponseInterface $response
-	 * @return array
 	 */
-	public function check(RequestInterface $request, ResponseInterface $response) {
+	#[\Override]
+	public function check(RequestInterface $request, ResponseInterface $response): array {
 		$auth = new HTTP\Auth\Bearer(
 			$this->realm,
 			$request,
@@ -118,12 +110,9 @@ abstract class AbstractBearer implements BackendInterface {
 	 * WWW-Authenticate headers may already have been set, and you'll want to
 	 * append your own WWW-Authenticate header instead of overwriting the
 	 * existing one.
-	 *
-	 * @param RequestInterface $request
-	 * @param ResponseInterface $response
-	 * @return void
 	 */
-	public function challenge(RequestInterface $request, ResponseInterface $response) {
+	#[\Override]
+	public function challenge(RequestInterface $request, ResponseInterface $response): void {
 		$auth = new HTTP\Auth\Bearer(
 			$this->realm,
 			$request,
