@@ -19,38 +19,136 @@ concurrency:
 
 env:
   APP_NAME: oauth2
-  PHP_VERSIONS: '["8.3"]'
+  PHP_VERSION: '8.4'
+  CORE_BRANCH: main
+  CORE_REPO: BWTECH-github/owncloud.online
 
 jobs:
-  get-vars:
+  lint-and-style:
+    name: Lint & Code Style
     runs-on: ubuntu-latest
-    outputs:
-      app-name: ${{ env.APP_NAME }}
-      php-versions: ${{ env.PHP_VERSIONS }}
     steps:
-      - name: Set variables
+      - name: Checkout app
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+          coverage: none
+          tools: composer:v2
+
+      - name: Cache Composer
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/composer
+          key: composer-${{ runner.os }}-php${{ env.PHP_VERSION }}-${{ hashFiles('composer.lock', 'vendor-bin/owncloud-codestyle/composer.json') }}
+          restore-keys: |
+            composer-${{ runner.os }}-php${{ env.PHP_VERSION }}-
+
+      - name: Install dependencies
+        run: composer install --no-progress --no-interaction
+
+      - name: PHP syntax check (php -l)
         run: |
-          echo "App name $APP_NAME"
-          echo "PHP versions string: $PHP_VERSIONS"
+          set -e
+          for dir in appinfo lib templates tests; do
+            if [ -d "$dir" ]; then
+              find "$dir" -name '*.php' -print0 | xargs -0 -n1 php -l
+            fi
+          done
 
-  semantic-git-messages:
-    name: Commits
-    uses: owncloud/reusable-workflows/.github/workflows/semantic-git-message.yml@main
+      - name: Install owncloud-codestyle
+        run: composer bin owncloud-codestyle install --no-progress --no-interaction
 
-  php-code-style:
-    name: PHP Code Style
-    needs:
-      - get-vars
-    uses: owncloud/reusable-workflows/.github/workflows/php-codestyle.yml@main
-    with:
-      app-name: ${{ needs.get-vars.outputs.app-name }}
-      php-versions: ${{ needs.get-vars.outputs.php-versions }}
+      - name: Run php-cs-fixer (dry-run)
+        run: |
+          php -d zend.enable_gc=0 vendor-bin/owncloud-codestyle/vendor/bin/php-cs-fixer fix \
+            --config=.php-cs-fixer.dist.php \
+            --dry-run --diff --allow-risky=yes -v
 
-  php-unit:
-    name: PHP Unit
-    needs:
-      - get-vars
-    uses: owncloud/reusable-workflows/.github/workflows/php-unit.yml@main
-    with:
-      app-name: ${{ needs.get-vars.outputs.app-name }}
-      php-versions: ${{ needs.get-vars.outputs.php-versions }}
+  integration:
+    name: Integration (smoke)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout owncloud.online core
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.CORE_REPO }}
+          ref: ${{ env.CORE_BRANCH }}
+          path: server
+
+      - name: Checkout app into core/apps
+        uses: actions/checkout@v4
+        with:
+          path: server/apps/${{ env.APP_NAME }}
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+          extensions: gd, gmp, intl, mbstring, pdo_sqlite, sqlite3, xml, zip
+          coverage: none
+          tools: composer:v2
+
+      - name: Cache Composer
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/composer
+          key: composer-${{ runner.os }}-php${{ env.PHP_VERSION }}-integration-${{ hashFiles('server/composer.lock', 'server/apps/${{ env.APP_NAME }}/composer.lock') }}
+          restore-keys: |
+            composer-${{ runner.os }}-php${{ env.PHP_VERSION }}-integration-
+
+      - name: Install core dependencies
+        working-directory: server
+        run: composer install --no-dev --no-progress --no-interaction
+
+      - name: Install app dependencies
+        working-directory: server/apps/${{ env.APP_NAME }}
+        run: composer install --no-dev --no-progress --no-interaction
+
+      - name: Install ownCloud (sqlite)
+        working-directory: server
+        run: |
+          mkdir -p data
+          php occ maintenance:install \
+            --database=sqlite \
+            --admin-user=admin \
+            --admin-pass=admin \
+            --data-dir="$PWD/data"
+
+      - name: Enable app
+        working-directory: server
+        run: php occ app:enable ${{ env.APP_NAME }}
+
+      - name: Verify OCC commands are registered
+        working-directory: server
+        run: |
+          set -e
+          # Extract <command> entries from info.xml and check each one is listed by `occ list`
+          COMMANDS=$(php -r '
+            $xml = simplexml_load_file("apps/${{ env.APP_NAME }}/appinfo/info.xml");
+            foreach ($xml->commands->command as $c) {
+              echo (string)$c, PHP_EOL;
+            }
+          ')
+          OCC_OUTPUT=$(php occ list --raw --no-ansi)
+          echo "$COMMANDS" | while read -r CLASS; do
+            [ -z "$CLASS" ] && continue
+            # Map FQCN to expected occ command name by reading the class file
+            FILE="apps/${{ env.APP_NAME }}/lib/$(echo "$CLASS" | sed 's|^OCA\\OAuth2\\||; s|\\|/|g').php"
+            if [ ! -f "$FILE" ]; then
+              echo "ERROR: command class file not found: $FILE"
+              exit 1
+            fi
+            CMD=$(grep -oE "setName\('[^']+'\)" "$FILE" | head -n1 | sed "s/setName('//; s/')//")
+            if [ -z "$CMD" ]; then
+              echo "ERROR: could not extract command name from $FILE"
+              exit 1
+            fi
+            if ! grep -qE "^[[:space:]]*$CMD([[:space:]]|$)" <<<"$OCC_OUTPUT"; then
+              echo "ERROR: occ command '$CMD' (from $CLASS) not registered"
+              exit 1
+            fi
+            echo "OK: $CMD"
+          done

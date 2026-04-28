@@ -2,7 +2,7 @@ name: Build dist
 
 on:
   push:
-    branches: [ master ]
+    branches: [master]
   pull_request:
     types:
       - opened
@@ -14,4 +14,36 @@ permissions:
 
 jobs:
   build:
-    uses: owncloud/reusable-workflows/.github/workflows/build.yml@main
+    name: Build distribution tarball
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          coverage: none
+          tools: composer:v2
+
+      - name: Cache Composer
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/composer
+          key: composer-${{ runner.os }}-php8.4-dist-${{ hashFiles('composer.lock') }}
+          restore-keys: |
+            composer-${{ runner.os }}-php8.4-dist-
+
+      - name: Install production dependencies
+        run: composer install --no-dev --no-progress --no-interaction --prefer-dist
+
+      - name: Build distribution
+        run: make dist
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: oauth2-dist
+          path: build/dist/*.tar.*
+          if-no-files-found: error
