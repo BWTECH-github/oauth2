@@ -4,7 +4,15 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
-## [Unreleased] ....
+## [Unreleased]
+
+### Changed
+
+- Forked to BWTECH-github/owncloud.online and rebranded for owncloud.online
+- Bumped minimum PHP version to 8.4
+- Modernized codebase to PHP 8.4 idioms (constructor property promotion, readonly properties, typed properties, `match`, `#[\Override]`, FQCN imports)
+- Replaced reusable workflows from `owncloud/reusable-workflows` with self-contained CI that clones owncloud.online as core
+- Removed Transifex translation sync workflow (secrets unavailable in fork)
 
 
 ## [0.6.1] - 2023-08-31

@@ -1,7 +1,8 @@
 <?php
 /**
  * @author Project Seminar "sciebo@Learnweb" of the University of Muenster
- * @copyright Copyright (c) 2017, University of Muenster
+ * @copyright Copyright (c) 2017, University of Muenster, ownCloud GmbH
+ * Modified by BW-Tech GmbH for owncloud.online (PHP 8.4).
  * @license AGPL-3.0
  *
  * This code is free software: you can redistribute it and/or modify
@@ -34,14 +35,11 @@ use OCP\AppFramework\Db\Entity;
 class AccessToken extends Entity {
 	public const EXPIRATION_TIME = 3600;
 
-	protected $token;
-	protected $clientId;
-	protected $userId;
-	protected $expires;
+	protected ?string $token = null;
+	protected ?int $clientId = null;
+	protected ?string $userId = null;
+	protected ?int $expires = null;
 
-	/**
-	 * AccessToken constructor.
-	 */
 	public function __construct() {
 		$this->addType('id', 'int');
 		$this->addType('token', 'string');
@@ -53,16 +51,14 @@ class AccessToken extends Entity {
 	/**
 	 * Resets the expiry time to EXPIRATION_TIME seconds from now.
 	 */
-	public function resetExpires() {
+	public function resetExpires(): void {
 		$this->setExpires(\time() + self::EXPIRATION_TIME);
 	}
 
 	/**
 	 * Determines if an access token has expired.
-	 *
-	 * @return boolean true if the access token has expired, false otherwise.
 	 */
-	public function hasExpired() {
+	public function hasExpired(): bool {
 		return \time() >= $this->getExpires();
 	}
 }

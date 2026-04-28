@@ -1,7 +1,8 @@
 <?php
 /**
  * @author Project Seminar "sciebo@Learnweb" of the University of Muenster
- * @copyright Copyright (c) 2017, University of Muenster
+ * @copyright Copyright (c) 2017, University of Muenster, ownCloud GmbH
+ * Modified by BW-Tech GmbH for owncloud.online (PHP 8.4).
  * @license AGPL-3.0
  *
  * This code is free software: you can redistribute it and/or modify
@@ -38,16 +39,13 @@ use OCP\AppFramework\Db\Entity;
 class AuthorizationCode extends Entity {
 	public const EXPIRATION_TIME = 600;
 
-	protected $code;
-	protected $clientId;
-	protected $userId;
-	protected $expires;
-	protected $codeChallenge;
-	protected $codeChallengeMethod;
+	protected ?string $code = null;
+	protected ?int $clientId = null;
+	protected ?string $userId = null;
+	protected ?int $expires = null;
+	protected ?string $codeChallenge = null;
+	protected ?string $codeChallengeMethod = null;
 
-	/**
-	 * AuthorizationCode constructor.
-	 */
 	public function __construct() {
 		$this->addType('id', 'int');
 		$this->addType('code', 'string');
@@ -61,30 +59,22 @@ class AuthorizationCode extends Entity {
 	/**
 	 * Resets the expiry time to EXPIRATION_TIME seconds from now.
 	 */
-	public function resetExpires() {
+	public function resetExpires(): void {
 		$this->setExpires(\time() + self::EXPIRATION_TIME);
 	}
 
 	/**
 	 * Determines if an authorization code has expired.
-	 *
-	 * @return boolean true if the authorization code has expired, false otherwise.
 	 */
-	public function hasExpired() {
+	public function hasExpired(): bool {
 		return \time() >= $this->getExpires();
 	}
 
-	public function isCodeVerifierValid($codeVerifier) {
-		if ($this->codeChallengeMethod === 'S256') {
-			// See https://tools.ietf.org/pdf/rfc7636.pdf#57
-			$h = \hash('sha256', $codeVerifier, true);
-			$encoded = Utilities::base64url_encode($h);
-			return $encoded === $this->codeChallenge;
-		} elseif ($this->codeChallengeMethod === 'plain' ||
-				   $this->codeChallengeMethod === '' ||
-				   $this->codeChallengeMethod === null) {
-			return $codeVerifier === $this->codeChallenge;
-		}
-		throw new UnsupportedPkceTransformException("Code challenge method {$this->codeChallengeMethod} not supported");
+	public function isCodeVerifierValid($codeVerifier): bool {
+		return match ($this->codeChallengeMethod) {
+			'S256' => Utilities::base64url_encode(\hash('sha256', $codeVerifier, true)) === $this->codeChallenge,
+			'plain', '', null => $codeVerifier === $this->codeChallenge,
+			default => throw new UnsupportedPkceTransformException("Code challenge method {$this->codeChallengeMethod} not supported"),
+		};
 	}
 }

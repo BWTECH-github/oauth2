@@ -3,6 +3,7 @@
  * @author Thomas Müller <thomas.mueller@tmit.eu>
  *
  * @copyright Copyright (c) 2018, ownCloud GmbH
+ * Modified by BW-Tech GmbH for owncloud.online (PHP 8.4).
  * @license AGPL-3.0
  *
  * This code is free software: you can redistribute it and/or modify
@@ -29,16 +30,12 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
 class RemoveClient extends Command {
-	/** @var ClientMapper */
-	private $clientMapper;
-
-	public function __construct(ClientMapper $clientMapper) {
+	public function __construct(private readonly ClientMapper $clientMapper) {
 		parent::__construct();
-
-		$this->clientMapper = $clientMapper;
 	}
 
-	protected function configure() {
+	#[\Override]
+	protected function configure(): void {
 		$this
 			->setName('oauth2:remove-client')
 			->setDescription('Removes an OAuth2 client')
@@ -50,19 +47,16 @@ class RemoveClient extends Command {
 	}
 
 	/**
-	 * @param InputInterface $input
-	 * @param OutputInterface $output
-	 *
-	 * @return int
 	 * @throws \OCP\AppFramework\Db\MultipleObjectsReturnedException
 	 */
+	#[\Override]
 	protected function execute(InputInterface $input, OutputInterface $output): int {
 		$id = $input->getArgument('client-id');
 		try {
 			$client = $this->clientMapper->findByIdentifier($id);
 			$this->clientMapper->delete($client);
 			$output->writeln("Client <$id> has been deleted");
-		} catch (DoesNotExistException $ex) {
+		} catch (DoesNotExistException) {
 			$output->writeln("Client <$id> is unknown");
 			return 1;
 		}

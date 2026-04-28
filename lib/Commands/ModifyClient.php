@@ -4,6 +4,7 @@
  * @author Jannik Stehle <jstehle@owncloud.com>
  *
  * @copyright Copyright (c) 2021, ownCloud GmbH
+ * Modified by BW-Tech GmbH for owncloud.online (PHP 8.4).
  * @license AGPL-3.0
  *
  * This code is free software: you can redistribute it and/or modify
@@ -22,6 +23,7 @@
 
 namespace OCA\OAuth2\Commands;
 
+use InvalidArgumentException;
 use OCA\OAuth2\Db\ClientMapper;
 use OCA\OAuth2\Utilities;
 use OCP\AppFramework\Db\DoesNotExistException;
@@ -31,16 +33,12 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
 class ModifyClient extends Command {
-	/** @var ClientMapper */
-	private $clientMapper;
-
-	public function __construct(ClientMapper $clientMapper) {
+	public function __construct(private readonly ClientMapper $clientMapper) {
 		parent::__construct();
-
-		$this->clientMapper = $clientMapper;
 	}
 
-	protected function configure() {
+	#[\Override]
+	protected function configure(): void {
 		$this
 			->setName('oauth2:modify-client')
 			->setDescription('Modify OAuth2 client details')
@@ -59,24 +57,21 @@ class ModifyClient extends Command {
 				InputArgument::REQUIRED,
 				'The new value of the key.'
 			);
-		;
 	}
 
 	/**
-	 * @param InputInterface $input
-	 * @param OutputInterface $output
-	 * @return int
 	 * @throws \OCP\AppFramework\Db\MultipleObjectsReturnedException
 	 */
+	#[\Override]
 	protected function execute(InputInterface $input, OutputInterface $output): int {
 		$name = $input->getArgument('name');
 		$key = $input->getArgument('key');
 		$value = $input->getArgument('value');
 
 		try {
-			/** @var  \OCA\OAuth2\Db\Client  $client */
+			/** @var \OCA\OAuth2\Db\Client $client */
 			$client = $this->clientMapper->findByName($name);
-		} catch (DoesNotExistException $e) {
+		} catch (DoesNotExistException) {
 			$output->writeln("Client with name <$name> does not exist.");
 			return 1;
 		}
@@ -95,23 +90,21 @@ class ModifyClient extends Command {
 			return 1;
 		}
 
-		if ($key === 'client-id' && \strlen($value) < 32) {
-			throw new \InvalidArgumentException('The client id should be at least 32 characters long');
-		}
-		if ($key === 'client-secret' && \strlen($value) < 32) {
-			throw new \InvalidArgumentException('The client secret should be at least 32 characters long');
-		}
-		if ($key === 'redirect-url' && !Utilities::isValidUrl($value)) {
-			throw new \InvalidArgumentException('The redirect URL is not valid.');
-		}
-		if ($key === 'allow-sub-domains' && !\in_array($value, ['true', 'false'])) {
-			throw new \InvalidArgumentException('Please enter true or false for allowed-sub-domains.');
-		}
-		if ($key === 'trusted' && !\in_array($value, ['true', 'false'])) {
-			throw new \InvalidArgumentException('Please enter true or false for trusted.');
-		}
+		match (true) {
+			$key === 'client-id' && \strlen($value) < 32
+				=> throw new InvalidArgumentException('The client id should be at least 32 characters long'),
+			$key === 'client-secret' && \strlen($value) < 32
+				=> throw new InvalidArgumentException('The client secret should be at least 32 characters long'),
+			$key === 'redirect-url' && !Utilities::isValidUrl($value)
+				=> throw new InvalidArgumentException('The redirect URL is not valid.'),
+			$key === 'allow-sub-domains' && !\in_array($value, ['true', 'false'])
+				=> throw new InvalidArgumentException('Please enter true or false for allowed-sub-domains.'),
+			$key === 'trusted' && !\in_array($value, ['true', 'false'])
+				=> throw new InvalidArgumentException('Please enter true or false for trusted.'),
+			default => null,
+		};
 
-		if ($key === 'trusted' || $key == 'allow-sub-domains') {
+		if ($key === 'trusted' || $key === 'allow-sub-domains') {
 			$value = \filter_var($value, FILTER_VALIDATE_BOOLEAN);
 		}
 
@@ -120,8 +113,8 @@ class ModifyClient extends Command {
 				$this->clientMapper->findByName($value);
 				$output->writeln("Client name <$value> is already known.");
 				return 1;
-			} catch (DoesNotExistException $e) {
-				// this is good - name is uniq
+			} catch (DoesNotExistException) {
+				// this is good - name is unique
 			}
 		}
 
@@ -130,8 +123,8 @@ class ModifyClient extends Command {
 				$this->clientMapper->findByIdentifier($value);
 				$output->writeln("Client <$value> is already known.");
 				return 1;
-			} catch (DoesNotExistException $ex) {
-				// this is good - identifier is uniq;
+			} catch (DoesNotExistException) {
+				// this is good - identifier is unique
 			}
 		}
 

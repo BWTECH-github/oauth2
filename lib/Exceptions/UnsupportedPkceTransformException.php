@@ -2,6 +2,7 @@
 /**
  * @author David Christofas <dchristofas@owncloud.com>
  * @copyright Copyright (c) 2020, ownCloud GmbH
+ * Modified by BW-Tech GmbH for owncloud.online (PHP 8.4).
  * @license AGPL-3.0
  *
  * This code is free software: you can redistribute it and/or modify
@@ -19,5 +20,7 @@
 
 namespace OCA\OAuth2\Exceptions;
 
-class UnsupportedPkceTransformException extends \Exception {
+use Exception;
+
+class UnsupportedPkceTransformException extends Exception {
 }

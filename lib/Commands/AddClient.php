@@ -3,6 +3,7 @@
  * @author Thomas Müller <thomas.mueller@tmit.eu>
  *
  * @copyright Copyright (c) 2018, ownCloud GmbH
+ * Modified by BW-Tech GmbH for owncloud.online (PHP 8.4).
  * @license AGPL-3.0
  *
  * This code is free software: you can redistribute it and/or modify
@@ -21,6 +22,7 @@
 
 namespace OCA\OAuth2\Commands;
 
+use InvalidArgumentException;
 use OCA\OAuth2\Db\Client;
 use OCA\OAuth2\Db\ClientMapper;
 use OCA\OAuth2\Utilities;
@@ -32,16 +34,12 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
 class AddClient extends Command {
-	/** @var ClientMapper */
-	private $clientMapper;
-
-	public function __construct(ClientMapper $clientMapper) {
+	public function __construct(private readonly ClientMapper $clientMapper) {
 		parent::__construct();
-
-		$this->clientMapper = $clientMapper;
 	}
 
-	protected function configure() {
+	#[\Override]
+	protected function configure(): void {
 		$this
 			->setName('oauth2:add-client')
 			->setDescription('Adds an OAuth2 client')
@@ -82,16 +80,13 @@ class AddClient extends Command {
 				InputArgument::OPTIONAL,
 				'Trust the client even if the redirect-url is localhost.',
 				'false'
-			)
-		;
+			);
 	}
 
 	/**
-	 * @param InputInterface $input
-	 * @param OutputInterface $output
-	 * @return int
 	 * @throws \OCP\AppFramework\Db\MultipleObjectsReturnedException
 	 */
+	#[\Override]
 	protected function execute(InputInterface $input, OutputInterface $output): int {
 		$name = $input->getArgument('name');
 		$id = $input->getArgument('client-id');
@@ -102,34 +97,34 @@ class AddClient extends Command {
 		$forceTrust = $input->getArgument('force-trust');
 
 		if (\strlen($id) < 32) {
-			throw new \InvalidArgumentException('The client id should be at least 32 characters long');
+			throw new InvalidArgumentException('The client id should be at least 32 characters long');
 		}
 		if (\strlen($secret) < 32) {
-			throw new \InvalidArgumentException('The client secret should be at least 32 characters long');
+			throw new InvalidArgumentException('The client secret should be at least 32 characters long');
 		}
 		if (!Utilities::isValidUrl($url)) {
-			throw new \InvalidArgumentException('The redirect URL is not valid.');
+			throw new InvalidArgumentException('The redirect URL is not valid.');
 		}
 		if (!\in_array($allowSubDomains, ['true', 'false'])) {
-			throw new \InvalidArgumentException('Please enter true or false for allowed-sub-domains.');
+			throw new InvalidArgumentException('Please enter true or false for allowed-sub-domains.');
 		}
 		if (!\in_array($trusted, ['true', 'false'])) {
-			throw new \InvalidArgumentException('Please enter true or false for trusted.');
+			throw new InvalidArgumentException('Please enter true or false for trusted.');
 		}
 		try {
-			// the name should be uniq
+			// the name should be unique
 			$this->clientMapper->findByName($name);
 			$output->writeln("Client name <$name> is already known.");
 			return 1;
-		} catch (DoesNotExistException $e) {
-			// this is good - name is uniq
+		} catch (DoesNotExistException) {
+			// this is good - name is unique
 		}
 
 		try {
 			$this->clientMapper->findByIdentifier($id);
 			$output->writeln("Client <$id> is already known.");
 			return 1;
-		} catch (DoesNotExistException $ex) {
+		} catch (DoesNotExistException) {
 			$client = new Client();
 			$client->setIdentifier($id);
 			$client->setName($name);

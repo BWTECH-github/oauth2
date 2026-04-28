@@ -1,7 +1,8 @@
 <?php
 /**
  * @author Project Seminar "sciebo@Learnweb" of the University of Muenster
- * @copyright Copyright (c) 2017, University of Muenster
+ * @copyright Copyright (c) 2017, University of Muenster, ownCloud GmbH
+ * Modified by BW-Tech GmbH for owncloud.online (PHP 8.4).
  * @license AGPL-3.0
  *
  * This code is free software: you can redistribute it and/or modify
@@ -20,6 +21,8 @@
 namespace OCA\OAuth2\Sabre;
 
 use OC\User\Session;
+use OC_Defaults;
+use OC_Util;
 use OCA\DAV\Connector\Sabre\Auth;
 use OCA\OAuth2\AuthModule;
 use OCP\IRequest;
@@ -29,48 +32,15 @@ class OAuth2 extends AbstractBearer {
 	/** @phan-suppress-next-line PhanUndeclaredClassConstant */
 	public const DAV_AUTHENTICATED = Auth::DAV_AUTHENTICATED;
 
-	/**
-	 * This is the prefix that will be used to generate principal urls.
-	 *
-	 * @var string
-	 */
-	protected $principalPrefix;
-
-	/** @var ISession */
-	private $session;
-
-	/** @var Session */
-	private $userSession;
-
-	/** @var IRequest */
-	private $request;
-
-	/** @var AuthModule */
-	private $authModule;
-
-	/**
-	 * OAuth2 constructor.
-	 *
-	 * @param ISession $session The session.
-	 * @param Session $userSession The user session.
-	 * @param IRequest $request The request.
-	 * @param string $principalPrefix The principal prefix.
-	 */
 	public function __construct(
-		ISession $session,
-		Session $userSession,
-		IRequest $request,
-		AuthModule $authModule,
-		$principalPrefix = 'principals/users/'
+		private readonly ISession $session,
+		private readonly Session $userSession,
+		private readonly IRequest $request,
+		private readonly AuthModule $authModule,
+		protected string $principalPrefix = 'principals/users/'
 	) {
-		$this->session = $session;
-		$this->userSession = $userSession;
-		$this->request = $request;
-		$this->authModule = $authModule;
-		$this->principalPrefix = $principalPrefix;
-
 		// setup realm
-		$defaults = new \OC_Defaults();
+		$defaults = new OC_Defaults();
 		$this->realm = $defaults->getName();
 	}
 
@@ -81,13 +51,10 @@ class OAuth2 extends AbstractBearer {
 	 * account was changed.
 	 *
 	 * @see https://github.com/owncloud/core/issues/13245
-	 *
-	 * @param string $username The username.
-	 * @return bool True if the user initially authenticated via DAV, false otherwise.
 	 */
-	private function isDavAuthenticated($username) {
-		return $this->session->get(self::DAV_AUTHENTICATED) !== null &&
-			$this->session->get(self::DAV_AUTHENTICATED) === $username;
+	private function isDavAuthenticated(string $username): bool {
+		return $this->session->get(self::DAV_AUTHENTICATED) !== null
+			&& $this->session->get(self::DAV_AUTHENTICATED) === $username;
 	}
 
 	/**
@@ -100,6 +67,7 @@ class OAuth2 extends AbstractBearer {
 	 * @return string|false The full principal url, if the token is valid, false otherwise.
 	 * @throws \OCP\AppFramework\Db\MultipleObjectsReturnedException
 	 */
+	#[\Override]
 	protected function validateBearerToken($bearerToken) {
 		if ($this->userSession->isLoggedIn() &&
 			$this->isDavAuthenticated($this->userSession->getUser()->getUID())) {
@@ -111,17 +79,17 @@ class OAuth2 extends AbstractBearer {
 
 			// setup the user
 			$userId = $this->userSession->getUser()->getUID();
-			\OC_Util::setupFS($userId);
+			OC_Util::setupFS($userId);
 			$this->session->close();
 			return $this->principalPrefix . $userId;
 		}
 
-		\OC_Util::setupFS(); //login hooks may need early access to the filesystem
+		OC_Util::setupFS(); //login hooks may need early access to the filesystem
 
 		try {
 			if ($this->userSession->tryAuthModuleLogin($this->request)) {
 				$userId = $this->userSession->getUser()->getUID();
-				\OC_Util::setupFS($userId);
+				OC_Util::setupFS($userId);
 				$this->session->set(self::DAV_AUTHENTICATED, $userId);
 				$this->session->close();
 				return $this->principalPrefix . $userId;
@@ -129,7 +97,7 @@ class OAuth2 extends AbstractBearer {
 
 			$this->session->close();
 			return false;
-		} catch (\Exception $ex) {
+		} catch (\Exception) {
 			$this->session->close();
 			return false;
 		}

@@ -1,7 +1,8 @@
 <?php
 /**
  * @author Project Seminar "sciebo@Learnweb" of the University of Muenster
- * @copyright Copyright (c) 2017, University of Muenster
+ * @copyright Copyright (c) 2017, University of Muenster, ownCloud GmbH
+ * Modified by BW-Tech GmbH for owncloud.online (PHP 8.4).
  * @license AGPL-3.0
  *
  * This code is free software: you can redistribute it and/or modify
@@ -19,6 +20,7 @@
 
 namespace OCA\OAuth2;
 
+use OC;
 use OC\User\LoginException;
 use OCA\OAuth2\AppInfo\Application;
 use OCA\OAuth2\Db\AccessTokenMapper;
@@ -27,22 +29,16 @@ use OCP\AppFramework\Db\MultipleObjectsReturnedException;
 use OCP\Authentication\IAuthModule;
 use OCP\IRequest;
 use OCP\IUser;
+use OCP\IUserManager;
 
 class AuthModule implements IAuthModule {
-	/**
-	 * @var bool
-	 */
-	private $tokenUnknown = false;
+	private bool $tokenUnknown = false;
 
 	/**
-	 * Authenticates a request.
-	 *
-	 * @param IRequest $request The request.
-	 *
-	 * @return null|IUser The user if the request is authenticated, null otherwise.
 	 * @throws \Exception
 	 */
-	public function auth(IRequest $request) {
+	#[\Override]
+	public function auth(IRequest $request): ?IUser {
 		$authHeader = $request->getHeader('Authorization');
 
 		if (\strpos($authHeader, 'Bearer ') === false) {
@@ -72,20 +68,13 @@ class AuthModule implements IAuthModule {
 	 * verifying the session, @see \OC\User\Session::checkTokenCredentials().
 	 *
 	 * Note: This means that only master key encryption is working with the app.
-	 *
-	 * @param IRequest $request The request.
-	 *
-	 * @return null|string
 	 */
-	public function getUserPassword(IRequest $request) {
+	#[\Override]
+	public function getUserPassword(IRequest $request): ?string {
 		return null;
 	}
 
-	/**
-	 * @param string $bearerToken
-	 * @return null|IUser
-	 */
-	public function authToken($bearerToken): ?IUser {
+	public function authToken(string $bearerToken): ?IUser {
 		$app = new Application();
 		$container = $app->getContainer();
 		$logger = $container->getServer()->getLogger();
@@ -98,24 +87,24 @@ class AuthModule implements IAuthModule {
 			$accessToken = $accessTokenMapper->findByToken($bearerToken);
 
 			if ($accessToken->hasExpired()) {
-				$logger->debug("token expired $bearerToken", ['app'=>__CLASS__]);
+				$logger->debug("token expired $bearerToken", ['app' => __CLASS__]);
 				return null;
 			}
-		} catch (DoesNotExistException $exception) {
-			// we don't know the token - openid connect can hanlde it
+		} catch (DoesNotExistException) {
+			// we don't know the token - openid connect can handle it
 			$this->tokenUnknown = true;
-			$logger->debug("token does not exist $bearerToken", ['app'=>__CLASS__]);
+			$logger->debug("token does not exist $bearerToken", ['app' => __CLASS__]);
 			return null;
-		} catch (MultipleObjectsReturnedException $e) {
-			$logger->debug("multiple tokens exist for $bearerToken", ['app'=>__CLASS__]);
+		} catch (MultipleObjectsReturnedException) {
+			$logger->debug("multiple tokens exist for $bearerToken", ['app' => __CLASS__]);
 			return null;
 		}
 
-		/** @var \OCP\IUserManager $userManager */
+		/** @var IUserManager $userManager */
 		$userManager = $container->query('UserManager');
 		$userId = $accessToken->getUserId();
 		if (\strstr($userId, ':')) {
-			list(1 => $userId) = \explode(':', $userId, 2);
+			[1 => $userId] = \explode(':', $userId, 2);
 		}
 		return $userManager->get($userId);
 	}
@@ -125,6 +114,6 @@ class AuthModule implements IAuthModule {
 			return false;
 		}
 
-		return \OC::$server->getAppManager()->isEnabledForUser('openidconnect');
+		return OC::$server->getAppManager()->isEnabledForUser('openidconnect');
 	}
 }

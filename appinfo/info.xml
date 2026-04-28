@@ -19,23 +19,22 @@ Instead of connecting clients with username/password, a user only needs to provi
 
 When using OAuth2 a unique access token is generated for each device or third party application. Users can check their authorized clients in the personal settings and have the ability to selectively invalidate access tokens when e.g. a device is lost. This strengthens control and access security significantly.
 
+This is a fork of owncloud/oauth2 maintained by BW-Tech GmbH for owncloud.online, modernized for PHP 8.4.
+
 ### Resources
 - [OAuth - Wikipedia](https://en.wikipedia.org/wiki/OAuth)
 - [OAuth protocol web page](https://oauth.net/2/)</description>
     <licence>AGPL</licence>
-    <author>Project Seminar "sciebo@Learnweb" of the University of Münster, Thomas Müller</author>
+    <author>ownCloud GmbH, modified by BW-Tech GmbH</author>
     <version>0.7.0</version>
     <namespace>OAuth2</namespace>
     <category>security</category>
-    <website>https://github.com/owncloud/oauth2</website>
-    <bugs>https://github.com/owncloud/oauth2/issues</bugs>
-    <repository type="git">https://github.com/owncloud/oauth2.git</repository>
-    <screenshot>https://raw.githubusercontent.com/owncloud/screenshots/master/oauth2/oauth2.jpg</screenshot>
-    <screenshot>https://raw.githubusercontent.com/owncloud/screenshots/master/oauth2/ownCloud-oauth2-app-auth-request.jpg</screenshot>
-    <screenshot>https://raw.githubusercontent.com/owncloud/screenshots/master/oauth2/ownCloud-oauth2-app-authorized.jpg</screenshot>
+    <website>https://bw.tech</website>
+    <bugs>https://github.com/BWTECH-github/owncloud.online/issues</bugs>
+    <repository type="git">https://github.com/BWTECH-github/owncloud.online.git</repository>
     <dependencies>
         <owncloud min-version="11" max-version="11" />
-        <php min-version="8.3" />
+        <php min-version="8.4" />
     </dependencies>
     <types>
         <authentication/>

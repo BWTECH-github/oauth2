@@ -2,6 +2,7 @@
 /**
  * @author Thomas Müller <thomas.mueller@tmit.eu>
  * @copyright Copyright (c) 2018, ownCloud GmbH
+ * Modified by BW-Tech GmbH for owncloud.online (PHP 8.4).
  * @license AGPL-3.0
  *
  * This code is free software: you can redistribute it and/or modify
@@ -21,44 +22,22 @@ namespace OCA\OAuth2\Controller;
 
 use OCP\AppFramework\ApiController;
 use OCP\AppFramework\Http\JSONResponse;
-
 use OCP\IAvatarManager;
 use OCP\IRequest;
 use OCP\IURLGenerator;
 use OCP\IUser;
 use OCP\IUserSession;
+use RuntimeException;
 
 class OpenIdConnectController extends ApiController {
-	/** @var IURLGenerator */
-	private $urlGenerator;
-
-	/** @var IUserSession */
-	private $userSession;
-
-	/** @var IAvatarManager */
-	private $avatarManager;
-
-	/**
-	 * OAuthApiController constructor.
-	 *
-	 * @param string $AppName The app's name.
-	 * @param IRequest $request The request.
-	 * @param IUserSession $userSession
-	 * @param IURLGenerator $urlGenerator The URL generator.
-	 * @param IAvatarManager $avatarManager
-	 */
 	public function __construct(
 		$AppName,
 		IRequest $request,
-		IUserSession $userSession,
-		IURLGenerator $urlGenerator,
-		IAvatarManager $avatarManager
+		private readonly IUserSession $userSession,
+		private readonly IURLGenerator $urlGenerator,
+		private readonly IAvatarManager $avatarManager
 	) {
 		parent::__construct($AppName, $request);
-
-		$this->userSession = $userSession;
-		$this->urlGenerator = $urlGenerator;
-		$this->avatarManager = $avatarManager;
 	}
 
 	/**
@@ -73,11 +52,11 @@ class OpenIdConnectController extends ApiController {
 	 * @CORS
 	 * @throws \Exception
 	 */
-	public function userInfo() {
+	public function userInfo(): JSONResponse {
 		$user = $this->userSession->getUser();
 		if ($user === null) {
 			// should never happen
-			throw new \RuntimeException('Not logged in');
+			throw new RuntimeException('Not logged in');
 		}
 
 		$data = [
@@ -97,12 +76,10 @@ class OpenIdConnectController extends ApiController {
 	}
 
 	/**
-	 * @param IUser $user
-	 * @return string | null
 	 * @throws \Exception
 	 * @throws \OCP\Files\NotFoundException
 	 */
-	public function getAvatarUrl($user) {
+	public function getAvatarUrl(IUser $user): ?string {
 		$avatar = $this->avatarManager->getAvatar($user->getUID());
 		if (!$avatar->exists()) {
 			return null;
@@ -111,7 +88,6 @@ class OpenIdConnectController extends ApiController {
 		$avatarUrl = $this->urlGenerator->linkTo('', 'remote.php');
 		$avatarUrl .= "/dav/avatars/{$user->getUID()}/96.jpeg";
 
-		$avatarUrl = $this->urlGenerator->getAbsoluteURL($avatarUrl);
-		return $avatarUrl;
+		return $this->urlGenerator->getAbsoluteURL($avatarUrl);
 	}
 }
