@@ -41,7 +41,7 @@ class AuthModule implements IAuthModule {
 	public function auth(IRequest $request): ?IUser {
 		$authHeader = $request->getHeader('Authorization');
 
-		if (\strpos($authHeader, 'Bearer ') === false) {
+		if (!\is_string($authHeader) || \stripos($authHeader, 'Bearer ') !== 0) {
 			return null;
 		}
 

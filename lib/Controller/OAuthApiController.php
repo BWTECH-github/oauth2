@@ -93,18 +93,20 @@ class OAuthApiController extends ApiController {
 				return new JSONResponse(['error' => 'invalid_client'], Http::STATUS_BAD_REQUEST);
 			}
 		} else {
-			if (!isset($_SERVER['PHP_AUTH_USER']) || !isset($_SERVER['PHP_AUTH_PW'])) {
+			$clientCredentials = $this->getClientCredentials();
+			if ($clientCredentials === null) {
 				return new JSONResponse(['error' => 'invalid_request'], Http::STATUS_BAD_REQUEST);
 			}
+			[$clientIdentifier, $clientSecret] = $clientCredentials;
 
 			try {
 				/** @var \OCA\OAuth2\Db\Client $client */
-				$client = $this->clientMapper->findByIdentifier($_SERVER['PHP_AUTH_USER']);
+				$client = $this->clientMapper->findByIdentifier($clientIdentifier);
 			} catch (DoesNotExistException) {
 				return new JSONResponse(['error' => 'invalid_client'], Http::STATUS_BAD_REQUEST);
 			}
 
-			if (\strcmp($client->getSecret(), $_SERVER['PHP_AUTH_PW']) !== 0) {
+			if (\strcmp($client->getSecret(), $clientSecret) !== 0) {
 				return new JSONResponse(['error' => 'invalid_client'], Http::STATUS_BAD_REQUEST);
 			}
 		}
@@ -170,7 +172,7 @@ class OAuthApiController extends ApiController {
 			case 'refresh_token':
 				$statusCode = Http::STATUS_BAD_REQUEST;
 				// This fixes the infinite loop issue with desktop client 2.4.2
-				if (\preg_match('/\bmirall\b.+2\.4\.2/i', $this->request->getHeader('User-Agent'))) {
+				if (\preg_match('/\bmirall\b.+2\.4\.2/i', (string)$this->request->getHeader('User-Agent'))) {
 					$statusCode = Http::STATUS_OK;
 				}
 
@@ -244,5 +246,32 @@ class OAuthApiController extends ApiController {
 				'message_url' => $this->urlGenerator->linkToRouteAbsolute($this->appName . '.page.authorizationSuccessful')
 			]
 		);
+	}
+
+	/**
+	 * @return array{0: string, 1: string}|null
+	 */
+	private function getClientCredentials(): ?array {
+		$user = $_SERVER['PHP_AUTH_USER'] ?? null;
+		$password = $_SERVER['PHP_AUTH_PW'] ?? null;
+		if (\array_key_exists('PHP_AUTH_USER', $_SERVER) || \array_key_exists('PHP_AUTH_PW', $_SERVER)) {
+			return \is_string($user) && \is_string($password) ? [$user, $password] : null;
+		}
+		if (\is_string($user) && \is_string($password)) {
+			return [$user, $password];
+		}
+
+		$authHeader = $this->request->getHeader('Authorization');
+		if (!\is_string($authHeader) || \stripos($authHeader, 'Basic ') !== 0) {
+			return null;
+		}
+
+		$decoded = \base64_decode(\substr($authHeader, 6), true);
+		if (!\is_string($decoded) || !\str_contains($decoded, ':')) {
+			return null;
+		}
+
+		[$clientId, $clientSecret] = \explode(':', $decoded, 2);
+		return [$clientId, $clientSecret];
 	}
 }

@@ -55,8 +55,8 @@ class SettingsController extends Controller {
 	}
 
 	public function addClient(): JSONResponse {
-		$redirectUri = \trim($this->request->getParam('redirect_uri', ''));
-		$name = \trim($this->request->getParam('name', ''));
+		$redirectUri = \trim((string)$this->request->getParam('redirect_uri', ''));
+		$name = \trim((string)$this->request->getParam('name', ''));
 		if ($name === '') {
 			return $this->sendErrorResponse($this->l10n->t('Name must not be empty'));
 		}
@@ -113,17 +113,22 @@ class SettingsController extends Controller {
 	 * @throws MultipleObjectsReturnedException
 	 */
 	public function deleteClient($id): JSONResponse {
-		if (!\is_int($id)) {
+		$clientId = $this->normalizeClientId($id);
+		if ($clientId === null) {
 			return $this->sendErrorResponse($this->l10n->t('Client id must be a number'));
 		}
-		/** @var Client $client */
-		$client = $this->clientMapper->find($id);
+		try {
+			/** @var Client $client */
+			$client = $this->clientMapper->find($clientId);
+		} catch (DoesNotExistException) {
+			return $this->sendErrorResponse($this->l10n->t('Client id is unknown'));
+		}
 		$clientName = $client->getName();
 		$this->clientMapper->delete($client);
 
-		$this->authorizationCodeMapper->deleteByClient($id);
-		$this->accessTokenMapper->deleteByClient($id);
-		$this->refreshTokenMapper->deleteByClient($id);
+		$this->authorizationCodeMapper->deleteByClient($clientId);
+		$this->accessTokenMapper->deleteByClient($clientId);
+		$this->refreshTokenMapper->deleteByClient($clientId);
 
 		$this->logger->info('The client "' . $clientName . '" has been deleted.', ['app' => $this->appName]);
 		return new JSONResponse(
@@ -141,7 +146,8 @@ class SettingsController extends Controller {
 	 * @NoAdminRequired
 	 */
 	public function revokeAuthorization($id): RedirectResponse {
-		if (!\is_int($id)) {
+		$clientId = $this->normalizeClientId($id);
+		if ($clientId === null) {
 			return new RedirectResponse(
 				$this->urlGenerator->linkToRouteAbsolute(
 					'settings.SettingsPage.getPersonal',
@@ -150,9 +156,9 @@ class SettingsController extends Controller {
 			);
 		}
 
-		$this->authorizationCodeMapper->deleteByClientUser($id, $this->UserId);
-		$this->accessTokenMapper->deleteByClientUser($id, $this->UserId);
-		$this->refreshTokenMapper->deleteByClientUser($id, $this->UserId);
+		$this->authorizationCodeMapper->deleteByClientUser($clientId, $this->UserId);
+		$this->accessTokenMapper->deleteByClientUser($clientId, $this->UserId);
+		$this->refreshTokenMapper->deleteByClientUser($clientId, $this->UserId);
 
 		return new RedirectResponse(
 			$this->urlGenerator->linkToRouteAbsolute(
@@ -170,5 +176,17 @@ class SettingsController extends Controller {
 				'data' => [] // OC.msg needs this
 			]
 		);
+	}
+
+	private function normalizeClientId($id): ?int {
+		if (\is_int($id)) {
+			return $id;
+		}
+
+		if (\is_string($id) && \ctype_digit($id)) {
+			return (int)$id;
+		}
+
+		return null;
 	}
 }

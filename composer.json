@@ -1,7 +1,7 @@
 {
     "name": "bwtech/oauth2",
-    "description": "OAuth2 token-based authorization interface (PHP 8.4 fork of owncloud/oauth2 for owncloud.online)",
-    "license": "AGPL",
+    "description": "OAuth2 token-based authorization interface. Modified by BW-Tech GmbH for owncloud.online (PHP 8.4 fork of owncloud/oauth2).",
+    "license": "AGPL-3.0-only",
     "authors": [
         {
             "name": "Thomas Müller",
@@ -22,7 +22,7 @@
     },
     "require": {
         "php": ">=8.4",
-        "rowbot/url": "^1.1"
+        "rowbot/url": "^4.1"
     },
     "require-dev": {
         "bamarni/composer-bin-plugin": "^1.8",

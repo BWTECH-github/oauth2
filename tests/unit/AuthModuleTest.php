@@ -2,6 +2,7 @@
 /**
  * @author Project Seminar "sciebo@Learnweb" of the University of Muenster
  * @copyright Copyright (c) 2017, University of Muenster
+ * Modified by BW-Tech GmbH for owncloud.online (PHP 8.4).
  * @license AGPL-3.0
  *
  * This code is free software: you can redistribute it and/or modify
@@ -85,7 +86,10 @@ class AuthModuleTest extends TestCase {
 		$accessToken->resetExpires();
 		$this->accessToken = $this->accessTokenMapper->insert($accessToken);
 
-		$this->authModule = new AuthModule();
+		$this->authModule = $this->getMockBuilder(AuthModule::class)
+			->onlyMethods(['tokenCanBeHandledByOpenIDConnect'])
+			->getMock();
+		$this->authModule->method('tokenCanBeHandledByOpenIDConnect')->willReturn(false);
 	}
 
 	protected function tearDown(): void {
@@ -100,6 +104,15 @@ class AuthModuleTest extends TestCase {
 	 * @throws \Exception
 	 */
 	public function testAuth() {
+		// Missing Authorization header
+		/** @var IRequest | MockObject $request */
+		$request = $this->getMockBuilder(IRequest::class)->getMock();
+		$request->expects($this->once())
+			->method('getHeader')
+			->with($this->equalTo('Authorization'))
+			->willReturn(null);
+		$this->assertNull($this->authModule->auth($request));
+
 		// Wrong Authorization header
 		/** @var IRequest | MockObject $request */
 		$request = $this->getMockBuilder(IRequest::class)->getMock();

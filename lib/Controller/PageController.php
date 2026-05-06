@@ -20,7 +20,6 @@
 
 namespace OCA\OAuth2\Controller;
 
-use OC_Util;
 use OCA\OAuth2\Db\AccessToken;
 use OCA\OAuth2\Db\AccessTokenMapper;
 use OCA\OAuth2\Db\AuthorizationCode;
@@ -203,7 +202,7 @@ class PageController extends Controller {
 		if (!\is_string($response_type) || !\is_string($client_id)
 			|| !\is_string($redirect_uri) || ($state !== null && !\is_string($state))
 		) {
-			return new RedirectResponse(OC_Util::getDefaultPageUrl());
+			return new RedirectResponse($this->getDefaultPageUrl());
 		}
 
 		$userUID = $this->userSession->getUser()->getUID();
@@ -214,11 +213,11 @@ class PageController extends Controller {
 					/** @var \OCA\OAuth2\Db\Client $client */
 					$client = $this->clientMapper->findByIdentifier($client_id);
 				} catch (DoesNotExistException) {
-					return new RedirectResponse(OC_Util::getDefaultPageUrl());
+					return new RedirectResponse($this->getDefaultPageUrl());
 				}
 
 				if (!Utilities::validateRedirectUri($client->getRedirectUri(), \urldecode($redirect_uri), $client->getAllowSubdomains())) {
-					return new RedirectResponse(OC_Util::getDefaultPageUrl());
+					return new RedirectResponse($this->getDefaultPageUrl());
 				}
 
 				$code = Utilities::generateRandom();
@@ -245,11 +244,11 @@ class PageController extends Controller {
 					/** @var \OCA\OAuth2\Db\Client $client */
 					$client = $this->clientMapper->findByIdentifier($client_id);
 				} catch (DoesNotExistException) {
-					return new RedirectResponse(OC_Util::getDefaultPageUrl());
+					return new RedirectResponse($this->getDefaultPageUrl());
 				}
 
 				if (!Utilities::validateRedirectUri($client->getRedirectUri(), \urldecode($redirect_uri), $client->getAllowSubdomains())) {
-					return new RedirectResponse(OC_Util::getDefaultPageUrl());
+					return new RedirectResponse($this->getDefaultPageUrl());
 				}
 
 				$token = Utilities::generateRandom();
@@ -271,7 +270,7 @@ class PageController extends Controller {
 
 				return new RedirectResponse($result);
 			default:
-				return new RedirectResponse(OC_Util::getDefaultPageUrl());
+				return new RedirectResponse($this->getDefaultPageUrl());
 		}
 	}
 
@@ -314,7 +313,7 @@ class PageController extends Controller {
 			return new TemplateResponse(
 				$this->appName,
 				'authorize-error',
-				['client_name' => null, 'back_url' => OC_Util::getDefaultPageUrl()]
+				['client_name' => null, 'back_url' => $this->getDefaultPageUrl()]
 			);
 		}
 		// logout the current user
@@ -376,5 +375,9 @@ class PageController extends Controller {
 			return true;
 		}
 		return $userObj->getUID() !== $this->userSession->getUser()->getUID();
+	}
+
+	private function getDefaultPageUrl(): string {
+		return \call_user_func(['OC_Util', 'getDefaultPageUrl']);
 	}
 }

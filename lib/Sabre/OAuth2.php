@@ -22,7 +22,6 @@ namespace OCA\OAuth2\Sabre;
 
 use OC\User\Session;
 use OC_Defaults;
-use OC_Util;
 use OCA\DAV\Connector\Sabre\Auth;
 use OCA\OAuth2\AuthModule;
 use OCP\IRequest;
@@ -79,17 +78,17 @@ class OAuth2 extends AbstractBearer {
 
 			// setup the user
 			$userId = $this->userSession->getUser()->getUID();
-			OC_Util::setupFS($userId);
+			\call_user_func(['OC_Util', 'setupFS'], $userId);
 			$this->session->close();
 			return $this->principalPrefix . $userId;
 		}
 
-		OC_Util::setupFS(); //login hooks may need early access to the filesystem
+		\call_user_func(['OC_Util', 'setupFS']); //login hooks may need early access to the filesystem
 
 		try {
 			if ($this->userSession->tryAuthModuleLogin($this->request)) {
 				$userId = $this->userSession->getUser()->getUID();
-				OC_Util::setupFS($userId);
+				\call_user_func(['OC_Util', 'setupFS'], $userId);
 				$this->session->set(self::DAV_AUTHENTICATED, $userId);
 				$this->session->close();
 				return $this->principalPrefix . $userId;
