@@ -2,6 +2,7 @@
 /**
  * @author Project Seminar "sciebo@Learnweb" of the University of Muenster
  * @copyright Copyright (c) 2017, University of Muenster
+ * Modified by BW-Tech GmbH for owncloud.online (PHP 8.4).
  * @license AGPL-3.0
  *
  * This code is free software: you can redistribute it and/or modify
@@ -205,7 +206,14 @@ class SettingsControllerTest extends TestCase {
 				return 'test';
 			}, 'error', 1],
 			[function ($obj) {
+				return 12;
+			}, 'error', 1],
+			[function ($obj) {
 				return $obj->client === null ? '' : $obj->client->getId();
+			}, 'success', 0
+			],
+			[function ($obj) {
+				return $obj->client === null ? '' : (string)$obj->client->getId();
 			}, 'success', 0
 			]
 		];
@@ -253,7 +261,7 @@ class SettingsControllerTest extends TestCase {
 		self::assertCount(1, $this->accessTokenMapper->findAll());
 		self::assertCount(1, $this->refreshTokenMapper->findAll());
 
-		$result = $this->controller->revokeAuthorization($this->client->getId(), $this->userId);
+		$result = $this->controller->revokeAuthorization((string)$this->client->getId(), $this->userId);
 		self::assertInstanceOf(RedirectResponse::class, $result);
 		self::assertEquals('/personal#' . $this->appName, $result->getRedirectURL());
 		self::assertCount(1, $this->clientMapper->findAll());

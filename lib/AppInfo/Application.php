@@ -84,12 +84,16 @@ class Application extends App {
 		}
 
 		$urlParts = \parse_url(\urldecode($redirectUrl));
-		/** @phan-suppress-next-line PhanTypePossiblyInvalidDimOffset */
+		if (!\is_array($urlParts) || !isset($urlParts['path'])) {
+			return;
+		}
 		if (\strpos($urlParts['path'], 'apps/oauth2/authorize') === false) {
 			return;
 		}
+		if (!isset($urlParts['query'])) {
+			return;
+		}
 		$params = [];
-		/** @phan-suppress-next-line PhanTypePossiblyInvalidDimOffset */
 		\parse_str($urlParts['query'], $params);
 		if (!isset($params['client_id'])) {
 			return;

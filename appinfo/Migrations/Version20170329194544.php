@@ -1,4 +1,8 @@
 <?php
+/**
+ * Modified by BW-Tech GmbH for owncloud.online (PHP 8.4).
+ */
+
 namespace OCA\oauth2\Migrations;
 
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
@@ -21,7 +25,7 @@ class Version20170329194544 implements ISimpleMigration {
 	 */
 	public function run(IOutput $out) {
 		// this is necessary to make the app work with OC <10.0.3
-		\OC_App::loadApp('oauth2', false);
+		\call_user_func(['OC_App', 'loadApp'], 'oauth2', false);
 		foreach (self::$registry as list($name, $redirectUrl, $clientId, $secret)) {
 			try {
 				$this->addClient($name, $redirectUrl, $clientId, $secret);

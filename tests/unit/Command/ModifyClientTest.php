@@ -4,6 +4,7 @@
  * @author Jannik Stehle <jstehle@owncloud.com>
  *
  * @copyright Copyright (c) 2021, ownCloud GmbH
+ * Modified by BW-Tech GmbH for owncloud.online (PHP 8.4).
  * @license AGPL-3.0
  *
  * This code is free software: you can redistribute it and/or modify
@@ -59,7 +60,16 @@ class ModifyClientTest extends TestCase {
 			])
 			->getMock();
 
-		$this->clientMapper->method('findByName')->willReturn($clientMock, $this->throwException(new DoesNotExistException('client does not exist')));
+		$findByNameCalls = 0;
+		$this->clientMapper->method('findByName')->willReturnCallback(
+			static function () use ($clientMock, &$findByNameCalls) {
+				$findByNameCalls++;
+				if ($findByNameCalls === 1) {
+					return $clientMock;
+				}
+				throw new DoesNotExistException('client does not exist');
+			}
+		);
 		$this->clientMapper->method('findByIdentifier')->willThrowException(new DoesNotExistException('client does not exist'));
 
 		$clientMock->expects($this->once())->method($expectedClientMethodCall)->with($value);
