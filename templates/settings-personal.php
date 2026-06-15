@@ -46,7 +46,7 @@ style('oauth2', 'main');
 				<td>
 					<form class="form-inline delete" data-confirm="<?php p($l->t('Are you sure you want to delete this item?')); ?>" action="<?php p($_['urlGenerator']->linkToRoute('oauth2.settings.revokeAuthorization', ['id' => $client->getId()])); ?>" method="post">
 						<input type="hidden" name="requesttoken" value="<?php p($_['requesttoken']) ?>" />
-						<input type="submit" class="button icon-delete" value="">
+						<input type="submit" class="button icon-delete" value="" aria-label="<?php p($l->t('Revoke authorization')); ?>" title="<?php p($l->t('Revoke authorization')); ?>">
 					</form>
 				</td>
 			</tr>
