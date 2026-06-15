@@ -9,16 +9,16 @@
 	<td><code class="oauth2-identifier"><?php p($client->getIdentifier()); ?></code></td>
 	<td><code><?php p($client->getSecret()); ?></code></td>
 	<?php if ($client->getAllowSubdomains()): ?>
-		<td class="icon-32 icon-checkmark"></td>
+		<td class="icon-32 icon-checkmark"><span class="hidden-visually"><?php p($l->t('Yes')); ?></span></td>
 	<?php else: ?>
-		<td></td>
+		<td><span class="hidden-visually"><?php p($l->t('No')); ?></span></td>
 	<?php endif; ?>
 	<?php if ($client->getTrusted()): ?>
-		<td class="icon-32 icon-checkmark"></td>
+		<td class="icon-32 icon-checkmark"><span class="hidden-visually"><?php p($l->t('Yes')); ?></span></td>
 	<?php else: ?>
-		<td></td>
+		<td><span class="hidden-visually"><?php p($l->t('No')); ?></span></td>
 	<?php endif; ?>
 	<td>
-		<button type="button" class="button icon-delete" data-id="<?php p($client->getId()) ?>"></button>
+		<button type="button" class="button icon-delete" data-id="<?php p($client->getId()) ?>" aria-label="<?php p($l->t('Delete')); ?>" title="<?php p($l->t('Delete')); ?>"></button>
 	</td>
 </tr>

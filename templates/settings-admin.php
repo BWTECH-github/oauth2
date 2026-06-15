@@ -62,8 +62,8 @@ if (!empty($_['clients'])) {
 
 	<h3><?php p($l->t('Add client')); ?></h3>
 	<form id="oauth2-new-client">
-		<input name="name" type="text" placeholder="<?php p($l->t('Name')); ?>">
-		<input name="redirect_uri" type="text" placeholder="<?php p($l->t('Redirection URI')); ?>">
+		<input name="name" type="text" placeholder="<?php p($l->t('Name')); ?>" aria-label="<?php p($l->t('Name')); ?>">
+		<input name="redirect_uri" type="text" placeholder="<?php p($l->t('Redirection URI')); ?>" aria-label="<?php p($l->t('Redirection URI')); ?>">
 		<input name="allow_subdomains" id="allow_subdomains" type="checkbox" class="checkbox" value="1"/>
 		<label for="allow_subdomains"><?php p($l->t('Allow subdomains'));?></label>
 		<input name="trusted" id="trusted" type="checkbox" class="checkbox" value="1"/>
