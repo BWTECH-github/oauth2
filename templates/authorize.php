@@ -34,7 +34,5 @@ style('oauth2', 'authorization');
 		<input type="hidden" name="requesttoken" value="<?php p($_['requesttoken']) ?>" />
 		<button type="submit" autofocus><?php p($l->t('Authorize')); ?></button>
 	</form>
-		<a href="<?php p($_['logout_url']); ?>">
-			<button><?php p($l->t('Switch users to continue')); ?></button>
-		</a>
+		<a class="button" href="<?php p($_['logout_url']); ?>"><?php p($l->t('Switch users to continue')); ?></a>
 </span>
