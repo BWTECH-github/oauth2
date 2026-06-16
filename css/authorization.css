@@ -1,4 +1,19 @@
-button {
+button,
+a.button {
 	width: 100%;
 	font-size: larger;
+}
+
+/* Anchor styled as button: match the core button look and keep block layout */
+a.button {
+	display: inline-block;
+	box-sizing: border-box;
+	text-align: center;
+	text-decoration: none;
+}
+
+/* Visible keyboard focus indicator (WCAG 2.4.7) */
+a.button:focus-visible {
+	outline: 2px solid #0082c9;
+	outline-offset: 2px;
 }
