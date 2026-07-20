@@ -106,7 +106,10 @@ class OAuthApiController extends ApiController {
 				return new JSONResponse(['error' => 'invalid_client'], Http::STATUS_BAD_REQUEST);
 			}
 
-			if (\strcmp($client->getSecret(), $clientSecret) !== 0) {
+			// Timing-safe comparison: strcmp() returns as soon as the first byte
+			// differs, leaking the shared secret one byte at a time to an attacker
+			// who measures response time. hash_equals() runs in constant time.
+			if (!\hash_equals((string)$client->getSecret(), (string)$clientSecret)) {
 				return new JSONResponse(['error' => 'invalid_client'], Http::STATUS_BAD_REQUEST);
 			}
 		}
@@ -143,7 +146,8 @@ class OAuthApiController extends ApiController {
 
 				try {
 					if (!$authorizationCode->isCodeVerifierValid($code_verifier)) {
-						$this->logger->debug("code verifier invalid: {$code_verifier}", ['app' => __CLASS__]);
+						// Do not log the PKCE code verifier itself — it is a per-flow secret.
+						$this->logger->debug('code verifier invalid', ['app' => __CLASS__]);
 						return new JSONResponse(['error' => 'invalid_grant', 'error_description' => 'code verifier invalid'], Http::STATUS_BAD_REQUEST);
 					}
 				} catch (UnsupportedPkceTransformException $e) {
