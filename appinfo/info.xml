@@ -26,7 +26,7 @@ This is a fork of owncloud/oauth2 maintained by BW-Tech GmbH for owncloud.online
 - [OAuth protocol web page](https://oauth.net/2/)</description>
     <licence>AGPL</licence>
     <author>ownCloud GmbH, modified by BW-Tech GmbH</author>
-    <version>0.7.0</version>
+    <version>0.7.1</version>
     <namespace>OAuth2</namespace>
     <category>security</category>
     <website>https://owncloud.online</website>
