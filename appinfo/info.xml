@@ -3,17 +3,17 @@
     <id>oauth2</id>
     <name>OAuth2</name>
     <summary>OAuth2 token-based authorization interface</summary>
-    <description>OAuth2 is the open industry-standard protocol for secure authorization of clients. It can be used as a way for users to grant web services or applications access to their data stored in ownCloud.
-The use of OAuth2 in ownCloud greatly enhances security while facilitating the integration of third party applications or web services:
+    <description>OAuth2 is the open industry-standard protocol for secure authorization of clients. It can be used as a way for users to grant web services or applications access to their data stored in owncloud.online.
+The use of OAuth2 in owncloud.online greatly enhances security while facilitating the integration of third party applications or web services:
 
-- Connect ownCloud clients (Desktop, Android, iOS) through a standardized and secure authorization flow
-- Provide a user authorization interface for developers to facilitate the integration of ownCloud in third party applications
+- Connect owncloud.online clients (Desktop, Android, iOS) through a standardized and secure authorization flow
+- Provide a user authorization interface for developers to facilitate the integration of owncloud.online in third party applications
 
 ### Benefits provided by the OAuth2 interface
 
-- No user passwords are being stored in ownCloud clients or third party web applications
+- No user passwords are being stored in owncloud.online clients or third party web applications
 
-Instead of connecting clients with username/password, a user only needs to provide the information once in the browser. The respective client is then provided with a unique access token which is used for future connections to the ownCloud server. ownCloud clients or third party applications never get to know the actual login credentials.
+Instead of connecting clients with username/password, a user only needs to provide the information once in the browser. The respective client is then provided with a unique access token which is used for future connections to the owncloud.online server. owncloud.online clients or third party applications never get to know the actual login credentials.
 
 - The use of different access tokens per client provides the ability to selectively revoke user sessions
 
@@ -29,9 +29,9 @@ This is a fork of owncloud/oauth2 maintained by BW-Tech GmbH for owncloud.online
     <version>0.7.0</version>
     <namespace>OAuth2</namespace>
     <category>security</category>
-    <website>https://bw.tech</website>
-    <bugs>https://github.com/BWTECH-github/owncloud.online/issues</bugs>
-    <repository type="git">https://github.com/BWTECH-github/owncloud.online.git</repository>
+    <website>https://owncloud.online</website>
+    <bugs>https://github.com/BWTECH-github/oauth2/issues</bugs>
+    <repository type="git">https://github.com/BWTECH-github/oauth2.git</repository>
     <dependencies>
         <owncloud min-version="11" max-version="11" />
         <php min-version="8.4" />
