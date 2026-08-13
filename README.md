@@ -1,8 +1,8 @@
 # OAuth 2.0
 
-OAuth 2.0 token-based authorization interface for [owncloud.online](https://github.com/BWTECH-github/owncloud.online), maintained by [BW-Tech GmbH](https://bw.tech). This is a PHP 8.4 fork of [owncloud/oauth2](https://github.com/owncloud/oauth2).
+OAuth 2.0 token-based authorization interface for [owncloud.online](https://github.com/BWTECH-github/owncloud.online), maintained by [BW-Tech GmbH](https://bw.tech). This is a PHP 8.4 fork of [owncloud/oauth2](https://github.com/BWTECH-github/oauth2).
 
-The app implements the [OAuth 2.0 Authorization Code Flow](https://tools.ietf.org/html/rfc6749#section-4.1) including the [PKCE extension](https://datatracker.ietf.org/doc/html/rfc7636), and exposes an [OpenID Connect UserInfo](https://openid.net/specs/openid-connect-core-1_0.html#UserInfo) endpoint so existing ownCloud clients (Desktop, Android, iOS) and third-party integrations can authenticate without ever holding the user's password.
+The app implements the [OAuth 2.0 Authorization Code Flow](https://tools.ietf.org/html/rfc6749#section-4.1) including the [PKCE extension](https://datatracker.ietf.org/doc/html/rfc7636), and exposes an [OpenID Connect UserInfo](https://openid.net/specs/openid-connect-core-1_0.html#UserInfo) endpoint so existing owncloud.online clients (Desktop, Android, iOS) and third-party integrations can authenticate without ever holding the user's password.
 
 ## Features
 
@@ -20,7 +20,7 @@ The app implements the [OAuth 2.0 Authorization Code Flow](https://tools.ietf.or
 | Component | Version            |
 | --------- | ------------------ |
 | PHP       | **>= 8.4**         |
-| ownCloud  | 11.x (owncloud.online) |
+| owncloud.online  | 11.x (owncloud.online) |
 | Database  | MySQL, MariaDB, PostgreSQL, Oracle, or SQLite |
 
 PHP extensions: `gmp`, `intl`, `mbstring` (transitively required by `rowbot/url`).
@@ -36,7 +36,7 @@ chown -R www-data:www-data .
 sudo -u www-data php ../../occ app:enable oauth2
 ```
 
-After enabling, the app's database tables are created automatically via migrations on the next ownCloud request or via `sudo -u www-data php occ upgrade`.
+After enabling, the app's database tables are created automatically via migrations on the next owncloud.online request or via `sudo -u www-data php occ upgrade`.
 
 ## Configuration
 
@@ -48,7 +48,7 @@ OAuth2 has no app-specific `config.php` keys — clients are managed entirely th
 'overwrite.cli.url'   => 'https://cloud.example.com',  // canonical URL used in message_url
 ```
 
-Endpoints (relative to the ownCloud base URL):
+Endpoints (relative to the owncloud.online base URL):
 
 | Purpose             | URL                                  | Method    |
 | ------------------- | ------------------------------------ | --------- |
@@ -59,7 +59,7 @@ Endpoints (relative to the ownCloud base URL):
 
 ## OCC Commands
 
-Run from the ownCloud root with the web user, e.g. `sudo -u www-data php occ <command>`.
+Run from the owncloud.online root with the web user, e.g. `sudo -u www-data php occ <command>`.
 
 ### `oauth2:add-client`
 
@@ -159,4 +159,4 @@ Access tokens expire after one hour (`AccessToken::EXPIRATION_TIME = 3600`); aut
 
 ## Attribution
 
-This is a fork of [owncloud/oauth2](https://github.com/owncloud/oauth2), originally developed by Project Seminar "sciebo@Learnweb" of the University of Münster and ownCloud GmbH. Modifications for PHP 8.4 and owncloud.online by BW-Tech GmbH. Licensed under AGPL-3.0; see [COPYING](COPYING).
+This is a fork of [owncloud/oauth2](https://github.com/BWTECH-github/oauth2), originally developed by Project Seminar "sciebo@Learnweb" of the University of Münster and ownCloud GmbH. Modifications for PHP 8.4 and owncloud.online by BW-Tech GmbH. Licensed under AGPL-3.0; see [COPYING](COPYING).
