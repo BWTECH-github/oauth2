@@ -29,7 +29,7 @@ PHP extensions: `gmp`, `intl`, `mbstring` (transitively required by `rowbot/url`
 
 ```bash
 cd /var/www/owncloud/apps
-git clone https://github.com/BWTECH-github/owncloud.online.git oauth2
+git clone https://github.com/BWTECH-github/oauth2.git
 cd oauth2
 composer install --no-dev
 chown -R www-data:www-data .
