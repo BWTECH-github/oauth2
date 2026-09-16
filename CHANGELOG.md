@@ -6,6 +6,20 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
+## [0.7.2] - 2026-09-16
+
+### Security
+
+- Der Client-Schlüssel (client secret) wird jetzt unabhängig von PKCE verlangt.
+  Bisher übersprang der Token-Endpunkt die Prüfung des Schlüssels, sobald ein
+  `client_id` und ein `code_verifier` mitgeschickt wurden – auch beim
+  `refresh_token`-Grant. Wer ein gestohlenes Refresh-Token besaß, konnte damit
+  den Schlüssel eines vertraulichen Clients umgehen. Ob der Schlüssel Pflicht
+  ist, entscheidet jetzt der Client-Datensatz (vertraulich vs. öffentlich);
+  öffentliche Clients müssen beim `authorization_code`-Grant PKCE nutzen.
+  Dieser Fix lief seit dem 03.07.2026 nur im SaaS-Bündel und fehlte hier und
+  im Marktplatz-Paket.
+
 ## [0.7.1] - 2026-08-13
 
 ### Changed
