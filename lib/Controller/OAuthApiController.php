@@ -81,36 +81,44 @@ class OAuthApiController extends ApiController {
 			return new JSONResponse(['error' => 'invalid_request'], Http::STATUS_BAD_REQUEST);
 		}
 
-		if (\is_string($client_id) && \is_string($code_verifier)) {
-			// The authorization code flow doesn't require a client secret in case of a public client.
-			// Instead, the client needs to use the PKCE extension and send a code challenge / code verifier.
-			// That is why we don't compare the client secret when the client id and code verifier are set in the
-			// query parameters.
-			try {
-				/** @var \OCA\OAuth2\Db\Client $client */
-				$client = $this->clientMapper->findByIdentifier($client_id);
-			} catch (DoesNotExistException) {
+		// Resolve the client and any presented secret independently of the grant type
+		// and auth style (the secret arrives via HTTP Basic). Whether the secret is
+		// *required* is then decided from the client record (confidential vs public),
+		// NOT from whether a PKCE code_verifier happens to be present: the old code
+		// skipped the secret check for any request carrying client_id + code_verifier,
+		// so an attacker holding a stolen refresh_token could bypass a confidential
+		// client's secret on the refresh_token grant just by adding a bogus
+		// code_verifier. PKCE is an auth-code mechanism and must not gate the secret.
+		$clientCredentials = $this->getClientCredentials();
+		$presentedSecret = null;
+		if ($clientCredentials !== null) {
+			[$clientIdentifier, $presentedSecret] = $clientCredentials;
+		} elseif (\is_string($client_id)) {
+			$clientIdentifier = $client_id;
+		} else {
+			return new JSONResponse(['error' => 'invalid_request'], Http::STATUS_BAD_REQUEST);
+		}
+
+		try {
+			/** @var \OCA\OAuth2\Db\Client $client */
+			$client = $this->clientMapper->findByIdentifier($clientIdentifier);
+		} catch (DoesNotExistException) {
+			return new JSONResponse(['error' => 'invalid_client'], Http::STATUS_BAD_REQUEST);
+		}
+
+		$expectedSecret = (string)$client->getSecret();
+		if ($expectedSecret !== '') {
+			// Confidential client: the secret is mandatory for every grant type and
+			// cannot be skipped by presenting a PKCE code_verifier. Timing-safe compare
+			// (strcmp leaks the secret one byte at a time via response time).
+			if ($presentedSecret === null || !\hash_equals($expectedSecret, (string)$presentedSecret)) {
 				return new JSONResponse(['error' => 'invalid_client'], Http::STATUS_BAD_REQUEST);
 			}
 		} else {
-			$clientCredentials = $this->getClientCredentials();
-			if ($clientCredentials === null) {
-				return new JSONResponse(['error' => 'invalid_request'], Http::STATUS_BAD_REQUEST);
-			}
-			[$clientIdentifier, $clientSecret] = $clientCredentials;
-
-			try {
-				/** @var \OCA\OAuth2\Db\Client $client */
-				$client = $this->clientMapper->findByIdentifier($clientIdentifier);
-			} catch (DoesNotExistException) {
-				return new JSONResponse(['error' => 'invalid_client'], Http::STATUS_BAD_REQUEST);
-			}
-
-			// Timing-safe comparison: strcmp() returns as soon as the first byte
-			// differs, leaking the shared secret one byte at a time to an attacker
-			// who measures response time. hash_equals() runs in constant time.
-			if (!\hash_equals((string)$client->getSecret(), (string)$clientSecret)) {
-				return new JSONResponse(['error' => 'invalid_client'], Http::STATUS_BAD_REQUEST);
+			// Public client (no registered secret): the authorization_code grant must
+			// use PKCE, i.e. present a code_verifier.
+			if ($grant_type === 'authorization_code' && !\is_string($code_verifier)) {
+				return new JSONResponse(['error' => 'invalid_request', 'error_description' => 'code_verifier required'], Http::STATUS_BAD_REQUEST);
 			}
 		}
 
