@@ -28,6 +28,12 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
   Verweise auf Fehlerbereich, Repository und Dokumentation zeigen auf das eigene
   Repository. Screenshots aus fremden Repositories entfernt.
 
+## [0.7.3] - 2026-09-22
+
+### Fixed
+
+- Freigabeseite: Herkunft der redirect_uri wird in der CSP-Direktive form-action freigegeben. Chromium brach die Weiterleitung zum Desktop-Client (http://localhost:…) und zu den Apps (oc://…) sonst ab, die Anmeldung blieb auf der Freigabeseite stehen.
+
 ## [Unreleased]
 
 ### Changed

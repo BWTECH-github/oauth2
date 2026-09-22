@@ -29,6 +29,7 @@ use OCA\OAuth2\Utilities;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\AppFramework\Db\MultipleObjectsReturnedException;
+use OCP\AppFramework\Http\ContentSecurityPolicy;
 use OCP\AppFramework\Http\RedirectResponse;
 use OCP\AppFramework\Http\TemplateResponse;
 use OCP\ILogger;
@@ -175,11 +176,41 @@ class PageController extends Controller {
 		$currentUser = $this->userSession->getUser();
 		$currentUser = $this->buildDisplayForUser($currentUser);
 
-		return new TemplateResponse($this->appName, 'authorize', [
+		$response = new TemplateResponse($this->appName, 'authorize', [
 			'client_name' => $client->getName(),
 			'current_user' => $currentUser,
 			'logout_url' => $logoutUrl
 		], 'guest');
+		$this->allowRedirectTargetAsFormAction($response, \urldecode($redirect_uri));
+		return $response;
+	}
+
+	/**
+	 * Chromium prüft die CSP-Direktive form-action auch gegen das Ziel der
+	 * 302-Weiterleitung nach dem POST auf /authorize (Firefox nicht). Der Kern
+	 * setzt form-action 'self'; die redirect_uri des Clients ist fremd
+	 * (http://localhost:<port> beim Desktop-Client, oc://… bei den Apps), der
+	 * Browser bricht die Weiterleitung ab und die Anmeldung bleibt auf der
+	 * Freigabeseite stehen. Die Herkunft der – oben bereits gegen den
+	 * registrierten Client geprüften – redirect_uri wird deshalb ausdrücklich
+	 * freigegeben. Kerne ohne diese API bleiben unberührt.
+	 */
+	private function allowRedirectTargetAsFormAction(TemplateResponse $response, string $redirectUri): void {
+		$csp = new ContentSecurityPolicy();
+		if (!\method_exists($csp, 'addAllowedFormActionDomain')) {
+			return;
+		}
+		$parts = \parse_url($redirectUri);
+		if (!\is_array($parts) || empty($parts['scheme'])) {
+			return;
+		}
+		// Ohne Host (etwa oc:… ohne Autorität) genügt das Schema als Quelle
+		$source = $parts['scheme'] . ':';
+		if (!empty($parts['host'])) {
+			$source = $parts['scheme'] . '://' . $parts['host'] . (isset($parts['port']) ? ':' . $parts['port'] : '');
+		}
+		$csp->addAllowedFormActionDomain($source);
+		$response->setContentSecurityPolicy($csp);
 	}
 
 	/**
