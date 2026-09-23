@@ -6,6 +6,25 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
+## [0.7.4] - 2026-09-23
+
+### Fixed
+
+- Vertrauenswürdige Clients: Hatte der Nutzer noch keine Sitzung, lief die
+  Kette Anmelde- bzw. 2FA-Formular -> 303 /authorize -> 303 redirect_uri.
+  Chromium prüft die CSP-Direktive form-action der Formularseite ('self') auch
+  gegen die letzte Weiterleitung und brach sie ab; der Code kam beim Client
+  (http://localhost:<port>, oc://…) nie an. /authorize antwortet in diesem Fall
+  jetzt mit einer eigenen Weiterleitungsseite (Skript plus sichtbarer Link).
+  Direkt geöffnete Adressen (Sec-Fetch-Site: none) werden weiter per HTTP
+  weitergeleitet.
+
+## [0.7.3] - 2026-09-22
+
+### Fixed
+
+- Freigabeseite: Herkunft der redirect_uri wird in der CSP-Direktive form-action freigegeben. Chromium brach die Weiterleitung zum Desktop-Client (http://localhost:…) und zu den Apps (oc://…) sonst ab, die Anmeldung blieb auf der Freigabeseite stehen.
+
 ## [0.7.2] - 2026-09-16
 
 ### Security
@@ -27,12 +46,6 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 - Produktname, Beschreibung und uebersetzte Zeichenketten nennen owncloud.online;
   Verweise auf Fehlerbereich, Repository und Dokumentation zeigen auf das eigene
   Repository. Screenshots aus fremden Repositories entfernt.
-
-## [0.7.3] - 2026-09-22
-
-### Fixed
-
-- Freigabeseite: Herkunft der redirect_uri wird in der CSP-Direktive form-action freigegeben. Chromium brach die Weiterleitung zum Desktop-Client (http://localhost:…) und zu den Apps (oc://…) sonst ab, die Anmeldung blieb auf der Freigabeseite stehen.
 
 ## [Unreleased]
 

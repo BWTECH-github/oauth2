@@ -22,6 +22,7 @@ namespace OCA\OAuth2\Tests\Unit\Controller;
 use OC_Util;
 use OCA\OAuth2\AppInfo\Application;
 use OCA\OAuth2\Controller\PageController;
+use OCA\OAuth2\Db\AccessToken;
 use OCA\OAuth2\Db\AccessTokenMapper;
 use OCA\OAuth2\Db\AuthorizationCode;
 use OCA\OAuth2\Db\AuthorizationCodeMapper;
@@ -34,6 +35,7 @@ use OCP\IURLGenerator;
 use OCP\IUser;
 use OCP\IUserManager;
 use OCP\IUserSession;
+use OCP\Template;
 use PHPUnit\Framework\MockObject\MockObject;
 use Test\TestCase;
 
@@ -68,6 +70,12 @@ class PageControllerTest extends TestCase {
 	/** @var Client $client */
 	private $client;
 
+	/** @var IRequest | MockObject $request */
+	private $request;
+
+	/** @var AccessTokenMapper $accessTokenMapper */
+	private $accessTokenMapper;
+
 	public function setUp(): void {
 		parent::setUp();
 
@@ -86,14 +94,12 @@ class PageControllerTest extends TestCase {
 		$this->client = $this->clientMapper->insert($client);
 
 		$this->authorizationCodeMapper = $container->query(AuthorizationCodeMapper::class);
-		/** @var AccessTokenMapper $accessTokenMapper */
-		$accessTokenMapper = $container->query(AccessTokenMapper::class);
+		$this->accessTokenMapper = $container->query(AccessTokenMapper::class);
 		/** @var IURLGenerator | MockObject $urlGenerator */
 		$urlGenerator = $this->createMock(IURLGenerator::class);
 		/** @var IUserSession | MockObject $userSession */
 		$userSession = $this->createMock(IUserSession::class);
-		/** @var IRequest | MockObject $request */
-		$request = $this->createMock(IRequest::class);
+		$this->request = $this->createMock(IRequest::class);
 		/** @var IUser | MockObject $user */
 		$user = $this->createMock(IUser::class);
 		/** @var IUserManager | MockObject $userManager */
@@ -104,10 +110,10 @@ class PageControllerTest extends TestCase {
 
 		$this->controller = new PageController(
 			$container->query('AppName'),
-			$request,
+			$this->request,
 			$this->clientMapper,
 			$this->authorizationCodeMapper,
-			$accessTokenMapper,
+			$this->accessTokenMapper,
 			$container->query('Logger'),
 			$urlGenerator,
 			$userSession,
@@ -255,9 +261,10 @@ class PageControllerTest extends TestCase {
 		self::assertEquals('authorization-successful', $result->getTemplateName());
 	}
 
-	public function testTrustedClient(): void {
-		$identifier = 'trusted-client';
-		// add trusted client
+	/**
+	 * Legt einen vertrauenswürdigen Client an; tearDown löscht ihn wieder.
+	 */
+	private function addTrustedClient(string $identifier): void {
 		$client = new Client();
 		$client->setIdentifier($identifier);
 		$client->setSecret($this->secret);
@@ -266,10 +273,103 @@ class PageControllerTest extends TestCase {
 		$client->setAllowSubdomains(false);
 		$client->setTrusted(true);
 		$this->client = $this->clientMapper->insert($client);
+	}
+
+	/**
+	 * Simuliert den Fetch-Metadata-Kopf Sec-Fetch-Site des Browsers (null = fehlt).
+	 */
+	private function withSecFetchSite(?string $value): void {
+		$this->request->method('getHeader')->willReturnCallback(
+			static fn (string $name) => \strcasecmp($name, 'Sec-Fetch-Site') === 0 ? $value : null
+		);
+	}
+
+	/**
+	 * Direkt geöffnete Adresse bei bestehender Sitzung (Sec-Fetch-Site: none,
+	 * etwa vom Desktop-Client im Browser gestartet): keine Formularnavigation
+	 * davor, die HTTP-Weiterleitung bleibt.
+	 */
+	public function testTrustedClient(): void {
+		$identifier = 'trusted-client';
+		$this->addTrustedClient($identifier);
+		$this->withSecFetchSite('none');
 
 		/** @var RedirectResponse $result */
 		$result = $this->controller->authorize('code', $identifier, \urldecode($this->redirectUri));
 		self::assertInstanceOf(RedirectResponse::class, $result);
 		self::assertStringStartsWith($this->redirectUri . '?code=', $result->getRedirectURL());
+	}
+
+	public static function providesNavigationsThatMayFollowAFormPost(): array {
+		return [
+			'after login or 2FA form (same origin)' => ['same-origin'],
+			'from a same-site page' => ['same-site'],
+			'from another site, e.g. IdP POST binding' => ['cross-site'],
+			'browser without fetch metadata' => [null],
+		];
+	}
+
+	/**
+	 * Chromium prüft form-action der Seite, deren Formular die Navigation
+	 * ausgelöst hat (Anmeldung, 2FA), auch gegen jede Weiterleitung danach.
+	 * Die Kette muss deshalb auf einer Seite der eigenen Herkunft enden.
+	 *
+	 * @dataProvider providesNavigationsThatMayFollowAFormPost
+	 */
+	public function testTrustedClientRendersRedirectPageWhenNavigationMayFollowAFormPost(?string $secFetchSite): void {
+		$identifier = 'trusted-client';
+		$this->addTrustedClient($identifier);
+		$this->withSecFetchSite($secFetchSite);
+
+		$result = $this->controller->authorize('code', $identifier, \urldecode($this->redirectUri), 'testingState');
+
+		self::assertInstanceOf(TemplateResponse::class, $result);
+		self::assertEquals('redirect', $result->getTemplateName());
+		self::assertEquals('guest', $result->getRenderAs());
+		$params = $result->getParams();
+		self::assertEquals('trusted client for testing', $params['client_name']);
+		[$url, $query] = \explode('?', $params['redirect_url'], 2);
+		self::assertEquals($this->redirectUri, $url);
+		\parse_str($query, $parameters);
+		self::assertEquals('testingState', $parameters['state']);
+		// Der Code auf der Seite ist der ausgestellte Code dieses Clients und Nutzers
+		/** @var AuthorizationCode $authorizationCode */
+		$authorizationCode = $this->authorizationCodeMapper->findByCode($parameters['code']);
+		self::assertEquals('Alice', $authorizationCode->getUserId());
+		self::assertEquals($this->client->getId(), $authorizationCode->getClientId());
+		$this->authorizationCodeMapper->delete($authorizationCode);
+	}
+
+	public function testTrustedClientImplicitFlowRendersRedirectPageWithToken(): void {
+		$identifier = 'trusted-client';
+		$this->addTrustedClient($identifier);
+		$this->withSecFetchSite('same-origin');
+
+		$result = $this->controller->authorize('token', $identifier, \urldecode($this->redirectUri));
+
+		self::assertInstanceOf(TemplateResponse::class, $result);
+		self::assertEquals('redirect', $result->getTemplateName());
+		[, $query] = \explode('?', $result->getParams()['redirect_url'], 2);
+		\parse_str($query, $parameters);
+		/** @var AccessToken $accessToken */
+		$accessToken = $this->accessTokenMapper->findByToken($parameters['access_token']);
+		self::assertEquals($this->client->getId(), $accessToken->getClientId());
+		$this->accessTokenMapper->delete($accessToken);
+	}
+
+	public function testRedirectTemplateEscapesTargetAndOffersVisibleLink(): void {
+		$template = new Template('oauth2', 'redirect', '');
+		$template->assign('client_name', 'Evil "<b>client</b>');
+		$template->assign('redirect_url', 'http://localhost:43124?code=a&state="><script>x</script>');
+
+		$html = $template->fetchPage();
+
+		self::assertStringContainsString('id="oauth2-redirect-link"', $html);
+		self::assertStringContainsString(
+			'href="http://localhost:43124?code=a&amp;state=&quot;&gt;&lt;script&gt;x&lt;/script&gt;"',
+			$html
+		);
+		self::assertStringNotContainsString('<script>x', $html);
+		self::assertStringNotContainsString('<b>client</b>', $html);
 	}
 }

@@ -157,7 +157,11 @@ class PageController extends Controller {
 
 		// trusted clients get their auth code back directly
 		if ($client->getTrusted()) {
-			return $this->generateAuthorizationCode($response_type, $client_id, $redirect_uri, $state, $code_challenge, $code_challenge_method);
+			$response = $this->generateAuthorizationCode($response_type, $client_id, $redirect_uri, $state, $code_challenge, $code_challenge_method);
+			if ($this->isDirectNavigation()) {
+				return $response;
+			}
+			return $this->buildRedirectPage((string)$client->getName(), $response->getRedirectURL());
 		}
 
 		$logoutUrl = $this->urlGenerator->linkToRouteAbsolute(
@@ -183,6 +187,32 @@ class PageController extends Controller {
 		], 'guest');
 		$this->allowRedirectTargetAsFormAction($response, \urldecode($redirect_uri));
 		return $response;
+	}
+
+	/**
+	 * Vertrauenswürdige Clients bekommen den Code ohne Zustimmungsseite. War
+	 * der Nutzer noch nicht angemeldet, führt die Kette über ein Formular:
+	 * Anmeldung (bzw. 2FA) POST -> 303 /authorize -> 303 redirect_uri. Chromium
+	 * prüft form-action der Formularseite ('self' im Kern) auch gegen jede
+	 * Weiterleitung danach und bricht die letzte (http://localhost:<port>,
+	 * oc://…) ab, der Code kommt nie an. Die Formularseite gehört dem Kern; die
+	 * Kette endet deshalb auf einer eigenen Seite (templates/redirect.php), die
+	 * per Skript weiterleitet und den Link sichtbar anbietet.
+	 *
+	 * Nur eine direkt geöffnete Adresse (Sec-Fetch-Site: none – Adressleiste
+	 * oder von einer Anwendung gestarteter Browser) kann keinem Formular folgen;
+	 * dort bleibt die HTTP-Weiterleitung, die ohne Skript und Nutzergeste
+	 * auskommt. Fehlt der Kopf (ältere Browser), gilt der Weg über die Seite.
+	 */
+	private function isDirectNavigation(): bool {
+		return $this->request->getHeader('Sec-Fetch-Site') === 'none';
+	}
+
+	private function buildRedirectPage(string $clientName, string $redirectUrl): TemplateResponse {
+		return new TemplateResponse($this->appName, 'redirect', [
+			'client_name' => $clientName,
+			'redirect_url' => $redirectUrl,
+		], 'guest');
 	}
 
 	/**
