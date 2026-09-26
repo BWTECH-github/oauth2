@@ -8,6 +8,9 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
 ## [0.7.3] - 2026-09-26
 
+Nicht zu verwechseln mit 0.7.3 auf `redesign` (dort ein CSP-Fix). Beim
+Übertrag nach `redesign` bekommt dieser Stand dort eine eigene, höhere Nummer.
+
 ### Fixed
 
 - **Eine aus oauth2 0.1.0 übernommene Datenbank brach das Update ab.** 0.1.0
@@ -20,6 +23,10 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
   der `database.xml` angelegt und protokolliert; die alte Tabelle bleibt
   unberührt (Autorisierungscodes gelten zehn Minuten, zu übernehmen gibt es
   dort nichts). Clients, Zugriffs- und Refresh-Tokens bleiben, wie sie sind.
+  Das gilt auch für eine 0.1.0-Datenbank, die unter ownCloud 10 schon auf
+  0.2.x bis 0.4.x gehoben wurde: Dort ist `Version20161122085340` bereits
+  (ohne Wirkung) verbucht, deshalb legt `Version20201126140622` die Tabelle
+  bei Bedarf selbst an.
 - **Standard-Clients doppelten einen von Hand angelegten Eintrag.**
   `Version20170329194544` verließ sich auf den eindeutigen Namensindex, den es
   in 0.1.0 noch nicht gab; auf der Kennung gab es nie einen. Wer den Desktop-
@@ -27,7 +34,18 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
   Datensatz mit derselben Kennung, und `findByIdentifier()` scheiterte danach
   an `MultipleObjectsReturnedException`. Die Migration überspringt jetzt jeden
   Standard-Client, dessen Kennung oder Name schon vorhanden ist, und lässt den
-  vorhandenen Eintrag unverändert.
+  vorhandenen Eintrag unverändert. Ist nur der Name belegt, fehlt danach die
+  offizielle Kennung und die jeweilige App kann sich nicht per OAuth2
+  anmelden; das meldet die Migration jetzt als Warnung (Ausgabe und
+  Protokoll) samt den `occ`-Befehlen, mit denen sich der Client nachtragen
+  lässt.
+- **Ein Hintergrundjob aus oauth2 0.1.0 blieb für immer liegen.** 0.1.0 trug
+  seinen Aufräumjob als `OC\BackgroundJob\Legacy\RegularJob` mit dem Argument
+  `["OCA\\OAuth2\\BackgroundJob\\CleanUp","run"]` ein. Die Kern-Klasse gibt es
+  nicht mehr; der Eintrag wurde bei jedem Versuch übersprungen und
+  protokolliert. Die neue Migration `Version20260926120000` entfernt genau
+  diesen Eintrag; aufgeräumt wird weiter über den Job
+  `OCA\OAuth2\BackgroundJob\CleanUp`.
 
 ## [0.7.2] - 2026-09-16
 

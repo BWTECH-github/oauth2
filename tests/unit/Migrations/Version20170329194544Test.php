@@ -105,14 +105,32 @@ class Version20170329194544Test extends TestCase {
 		self::assertSame(['Android', 'Mein Desktop', 'iOS'], $this->names());
 	}
 
-	public function testClientWithTheSameNameIsKept(): void {
+	public function testClientWithTheSameNameIsKeptAndReported(): void {
 		$existing = $this->addClient('Android', 'eine-andere-kennung', 'geheim', 'oc://android.example.org');
+
+		// die offizielle Android-App kann sich ohne ihre Kennung nicht anmelden -
+		// das muss die Verwaltung sehen, samt dem Weg, es zu beheben
+		$this->out->expects($this->once())->method('warning')
+			->with($this->logicalAnd(
+				$this->stringContains('<Android>'),
+				$this->stringContains('eine-andere-kennung'),
+				$this->stringContains('occ oauth2:modify-client'),
+				$this->stringContains(self::ANDROID_ID)
+			));
 
 		(new Version20170329194544())->run($this->out);
 
 		self::assertSame(['Android', 'Desktop Client', 'iOS'], $this->names());
 		self::assertSame([], $this->clientsWithIdentifier(self::ANDROID_ID));
 		self::assertSame($existing->getId(), $this->mapper->findByName('Android')->getId());
+		self::assertSame('eine-andere-kennung', $this->mapper->findByName('Android')->getIdentifier());
+	}
+
+	public function testWithoutConflictNothingIsReported(): void {
+		$this->addClient('Mein Desktop', self::DESKTOP_ID, 'eigenes-geheimnis', 'http://localhost:*');
+		$this->out->expects($this->never())->method('warning');
+
+		(new Version20170329194544())->run($this->out);
 	}
 
 	public function testSecondRunIsANoop(): void {

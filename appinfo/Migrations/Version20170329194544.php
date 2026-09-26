@@ -36,8 +36,21 @@ class Version20170329194544 implements ISimpleMigration {
 			// findByIdentifier() scheitert dann an MultipleObjectsReturned, die
 			// Anmeldung dieses Clients also komplett. Vorhandene Einträge bleiben,
 			// wie sie sind.
-			if ($this->isKnownClient($name, $clientId)) {
+			if ($this->isKnownIdentifier($clientId)) {
 				$out->info("The client <$name> already known.");
+				continue;
+			}
+			// Ist nur der Name belegt, fehlt die offizielle Kennung - die App
+			// kann sich dann nicht per OAuth2 anmelden. Überschrieben wird der
+			// vorhandene Eintrag trotzdem nicht; die Verwaltung muss das sehen.
+			$nameHolder = $this->getIdentifierOfClientNamed($name);
+			if ($nameHolder !== null) {
+				$message = "The client <$name> was not added: the name is already used by the client with id <$nameHolder>."
+					. " The official $name app cannot sign in via OAuth2 until it is added - for example, rename the"
+					. " existing client with 'occ oauth2:modify-client \"$name\" name \"<new name>\"' and run"
+					. " 'occ oauth2:add-client \"$name\" $clientId $secret \"$redirectUrl\"'.";
+				$out->warning($message);
+				\OC::$server->getLogger()->warning($message, ['app' => 'oauth2']);
 				continue;
 			}
 			try {
@@ -51,26 +64,49 @@ class Version20170329194544 implements ISimpleMigration {
 	}
 
 	/**
-	 * Ob es schon einen Client mit dieser Kennung oder diesem Namen gibt.
+	 * Ob es schon einen Client mit dieser Kennung gibt.
 	 *
-	 * @param string $name
 	 * @param string $clientId
 	 * @return bool
 	 */
-	protected function isKnownClient($name, $clientId) {
+	protected function isKnownIdentifier($clientId) {
 		/** @var ClientMapper $mapper */
 		$mapper = \OC::$server->query(ClientMapper::class);
-		foreach (['findByIdentifier' => $clientId, 'findByName' => $name] as $finder => $value) {
-			try {
-				$mapper->$finder($value);
-				return true;
-			} catch (DoesNotExistException $e) {
-				// weiter mit dem nächsten Merkmal
-			} catch (MultipleObjectsReturnedException $e) {
-				return true;
-			}
+		try {
+			$mapper->findByIdentifier($clientId);
+			return true;
+		} catch (DoesNotExistException $e) {
+			return false;
+		} catch (MultipleObjectsReturnedException $e) {
+			return true;
 		}
-		return false;
+	}
+
+	/**
+	 * Die Kennung des Clients, der diesen Namen trägt, oder null, wenn der Name
+	 * frei ist. Tragen ihn mehrere (0.1.0 hatte keinen eindeutigen Index), sind
+	 * ihre Kennungen mit Komma verbunden.
+	 *
+	 * @param string $name
+	 * @return string|null
+	 */
+	protected function getIdentifierOfClientNamed($name) {
+		/** @var ClientMapper $mapper */
+		$mapper = \OC::$server->query(ClientMapper::class);
+		try {
+			return $mapper->findByName($name)->getIdentifier();
+		} catch (DoesNotExistException $e) {
+			return null;
+		} catch (MultipleObjectsReturnedException $e) {
+			$identifiers = [];
+			foreach ($mapper->findAll() as $client) {
+				// die Datenbank vergleicht je nach Kollation ohne Groß-/Kleinschreibung
+				if (\strcasecmp($client->getName(), $name) === 0) {
+					$identifiers[] = $client->getIdentifier();
+				}
+			}
+			return $identifiers === [] ? '(several)' : \implode(', ', $identifiers);
+		}
 	}
 
 	/**

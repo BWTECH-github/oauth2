@@ -175,6 +175,65 @@ class Version20161122085340Test extends TestCase {
 		self::assertSame($afterFirst, $this->signature($schema));
 	}
 
+	/**
+	 * Schema einer 0.1.0-Datenbank, die unter ownCloud 10 auf 0.2.x bis 0.4.x
+	 * gehoben wurde: Version20161122085340 (ausgestiegen), Version20170329194544
+	 * und Version20170724162518 sind verbucht, oauth2_auth_codes gibt es nicht.
+	 */
+	private function schema010UpgradedTo04x(): Schema {
+		$schema = $this->schema010();
+		(new Version20170724162518())->changeSchema($schema, ['tablePrefix' => $this->prefix]);
+		return $schema;
+	}
+
+	/**
+	 * Was nach dem Umzug noch aussteht, wenn die ersten drei Migrationen schon
+	 * verbucht sind.
+	 */
+	private function runRemainingChain(Schema $schema): void {
+		$options = ['tablePrefix' => $this->prefix];
+		(new Version20201123114127())->changeSchema($schema, $options);
+		(new Version20201126140622())->changeSchema($schema, $options);
+		(new Version20220312110422())->changeSchema($schema, $options);
+	}
+
+	public function testSchemaFrom010UpgradedTo04xGetsTheMissingTableInTheRemainingChain(): void {
+		$schema = $this->schema010UpgradedTo04x();
+		self::assertFalse($schema->hasTable($this->prefix . 'oauth2_auth_codes'));
+		$before = $this->signature($schema);
+
+		// vorher brach Version20201126140622 hier mit einer SchemaException ab
+		$this->runRemainingChain($schema);
+
+		$name = $this->prefix . 'oauth2_auth_codes';
+		self::assertTrue($schema->hasTable($name));
+		self::assertSame(
+			['client_id', 'code', 'code_challenge', 'code_challenge_method', 'expires', 'id', 'user_id'],
+			$this->columnNames($schema, 'oauth2_auth_codes')
+		);
+		// gleiche Spalten wie nach der vollständigen Kette
+		$full = $this->schema010();
+		$this->runChain($full);
+		self::assertSame($this->signature($full)[$name][0], $this->signature($schema)[$name][0]);
+		// vorhandene Spalten bleiben unverändert
+		$after = $this->signature($schema);
+		foreach ($before as $table => [$columns]) {
+			foreach ($columns as $column => $definition) {
+				self::assertSame($definition, $after[$table][0][$column], "$table.$column");
+			}
+		}
+	}
+
+	public function testRemainingChainTwiceIsANoop(): void {
+		$schema = $this->schema010UpgradedTo04x();
+		$this->runRemainingChain($schema);
+		$afterFirst = $this->signature($schema);
+
+		$this->runRemainingChain($schema);
+
+		self::assertSame($afterFirst, $this->signature($schema));
+	}
+
 	public function testCurrentSchemaIsLeftAlone(): void {
 		$schema = $this->schemaFromXml(__DIR__ . '/../../../appinfo/database.xml');
 		$before = $this->signature($schema);

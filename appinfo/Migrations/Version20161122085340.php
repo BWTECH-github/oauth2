@@ -14,7 +14,7 @@ class Version20161122085340 implements ISchemaMigration {
 	public function changeSchema(Schema $schema, array $options) {
 		$prefix = $options['tablePrefix'];
 		if ($schema->hasTable("{$prefix}oauth2_clients")) {
-			$this->addMissingAuthCodesTable($schema, $prefix);
+			self::addMissingAuthCodesTable($schema, $prefix);
 			return;
 		}
 
@@ -38,10 +38,14 @@ class Version20161122085340 implements ISchemaMigration {
 	 * bleibt unangetastet: Autorisierungscodes gelten zehn Minuten, zum
 	 * Übernehmen ist dort nichts.
 	 *
+	 * Wurde die 0.1.0-Datenbank unter ownCloud 10 schon auf 0.2.x bis 0.4.x
+	 * gehoben, ist diese Migration dort bereits (ohne Wirkung) verbucht und
+	 * läuft hier nicht mehr; dann ruft Version20201126140622 diese Methode.
+	 *
 	 * @param Schema $schema
 	 * @param string $prefix
 	 */
-	private function addMissingAuthCodesTable(Schema $schema, $prefix) {
+	public static function addMissingAuthCodesTable(Schema $schema, $prefix) {
 		$tableName = "{$prefix}oauth2_auth_codes";
 		if ($schema->hasTable($tableName)) {
 			return;
