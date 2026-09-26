@@ -8,6 +8,8 @@ namespace OCA\oauth2\Migrations;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use OCA\OAuth2\Db\Client;
 use OCA\OAuth2\Db\ClientMapper;
+use OCP\AppFramework\Db\DoesNotExistException;
+use OCP\AppFramework\Db\MultipleObjectsReturnedException;
 use OCP\Migration\ISimpleMigration;
 use OCP\Migration\IOutput;
 
@@ -27,6 +29,17 @@ class Version20170329194544 implements ISimpleMigration {
 		// this is necessary to make the app work with OC <10.0.3
 		\call_user_func(['OC_App', 'loadApp'], 'oauth2', false);
 		foreach (self::$registry as list($name, $redirectUrl, $clientId, $secret)) {
+			// Eine aus oauth2 0.1.0 übernommene Datenbank hat keinen eindeutigen
+			// Index auf dem Namen, und auf der Kennung gab es nie einen. Wer den
+			// Desktop- oder Mobil-Client damals von Hand eingetragen hat, bekäme
+			// sonst einen zweiten Eintrag mit derselben Kennung - und
+			// findByIdentifier() scheitert dann an MultipleObjectsReturned, die
+			// Anmeldung dieses Clients also komplett. Vorhandene Einträge bleiben,
+			// wie sie sind.
+			if ($this->isKnownClient($name, $clientId)) {
+				$out->info("The client <$name> already known.");
+				continue;
+			}
 			try {
 				$this->addClient($name, $redirectUrl, $clientId, $secret);
 
@@ -35,6 +48,29 @@ class Version20170329194544 implements ISimpleMigration {
 				$out->info("The client <$name> already known.");
 			}
 		}
+	}
+
+	/**
+	 * Ob es schon einen Client mit dieser Kennung oder diesem Namen gibt.
+	 *
+	 * @param string $name
+	 * @param string $clientId
+	 * @return bool
+	 */
+	protected function isKnownClient($name, $clientId) {
+		/** @var ClientMapper $mapper */
+		$mapper = \OC::$server->query(ClientMapper::class);
+		foreach (['findByIdentifier' => $clientId, 'findByName' => $name] as $finder => $value) {
+			try {
+				$mapper->$finder($value);
+				return true;
+			} catch (DoesNotExistException $e) {
+				// weiter mit dem nächsten Merkmal
+			} catch (MultipleObjectsReturnedException $e) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/**

@@ -6,6 +6,29 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
+## [0.7.3] - 2026-09-26
+
+### Fixed
+
+- **Eine aus oauth2 0.1.0 übernommene Datenbank brach das Update ab.** 0.1.0
+  (ownCloud 10.0, 2017) legte die Tabelle für Autorisierungscodes noch als
+  `oauth2_authorization_codes` an; 0.2.0 hat sie in `oauth2_auth_codes`
+  umbenannt, aber `Version20161122085340` stieg bei vorhandener
+  `oauth2_clients` einfach aus. Die Tabelle entstand so nie, und
+  `Version20201126140622` scheiterte an ihr mit `TableDoesNotExist` – damit
+  das ganze App-Update. Die fehlende Tabelle wird jetzt mit der Definition aus
+  der `database.xml` angelegt und protokolliert; die alte Tabelle bleibt
+  unberührt (Autorisierungscodes gelten zehn Minuten, zu übernehmen gibt es
+  dort nichts). Clients, Zugriffs- und Refresh-Tokens bleiben, wie sie sind.
+- **Standard-Clients doppelten einen von Hand angelegten Eintrag.**
+  `Version20170329194544` verließ sich auf den eindeutigen Namensindex, den es
+  in 0.1.0 noch nicht gab; auf der Kennung gab es nie einen. Wer den Desktop-
+  oder Mobil-Client damals selbst eingetragen hatte, bekam einen zweiten
+  Datensatz mit derselben Kennung, und `findByIdentifier()` scheiterte danach
+  an `MultipleObjectsReturnedException`. Die Migration überspringt jetzt jeden
+  Standard-Client, dessen Kennung oder Name schon vorhanden ist, und lässt den
+  vorhandenen Eintrag unverändert.
+
 ## [0.7.2] - 2026-09-16
 
 ### Security
