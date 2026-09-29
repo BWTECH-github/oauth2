@@ -6,6 +6,26 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
+## [0.8.0] - 2026-09-29
+
+Inhaltlich gleich 0.7.3, geändert ist nur die Versionsnummer. `redesign`
+steht bei 0.7.4 und braucht beim Übertrag eine Nummer über 0.8.0.
+
+### Changed
+
+- **Versionsnummer auf 0.8.0 angehoben, damit die Migration aus 0.7.3 beim
+  Update läuft.** Der Kern aktualisiert eine App nach Ordnertausch und
+  `occ upgrade` nur, wenn sich mindestens die zweite Stelle ihrer
+  Versionsnummer ändert (`OC_App::shouldUpgrade`). Ändert sich nur die dritte
+  Stelle (0.7.2 → 0.7.3), trägt er die neue Nummer ein und führt weder
+  Migrationen noch Repair-Schritte aus. `Version20260926120000` blieb so
+  offen, und der verwaiste Hintergrundjob aus oauth2 0.1.0 blieb stehen, bis
+  jemand `occ migrations:migrate oauth2` von Hand aufrief. Mit 0.8.0 läuft
+  die Migration beim Update von 0.7.2 wie von 0.7.3 aus. Am Code ändert sich
+  nichts. Anders als bei einem Sprung in der dritten Stelle zeigt die Instanz
+  zwischen Ordnertausch und `occ upgrade` statt der Anmeldung die
+  Update-Seite.
+
 ## [0.7.3] - 2026-09-26
 
 Nicht zu verwechseln mit 0.7.3 auf `redesign` (dort ein CSP-Fix). Beim
