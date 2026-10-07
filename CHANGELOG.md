@@ -6,6 +6,17 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
+## [0.8.1] - 2026-10-07
+
+Redesign-Linie: enthält main bis 0.8.0 (Migrationen für Datenbanken aus oauth2 0.1.0) und die Redesign-Fixes 0.7.3/0.7.4. Die Nummer liegt über 0.8.0, damit ein Update von 0.7.x die Migrationen ausführt.
+
+### Fixed
+
+- Anrede: Die Autorisierungsseite mischte in de Du und Sie („Du bist eingeloggt als …“, aber „Zugriff auf Ihren Benutzernamen“), die Rückfrage beim Widerrufen siezte. de und de_CH duzen jetzt, de_DE siezt.
+- Sprache: „Delete“, „Revoke authorization“ (Tooltip und Sprachausgabe), „Yes“/„No“ (Sprachausgabe der Client-Liste) und „Client id is unknown“ fehlten in allen deutschen Katalogen.
+- „Deleting...“ heißt „Wird gelöscht …“ (de_DE duzte mit „Lösche...“), „Secret“ einheitlich „Geheimer Schlüssel“.
+- de_CH: zehn genutzte Texte aus de ergänzt (u. a. Weiterleitungsseite nach der Autorisierung).
+
 ## [0.8.0] - 2026-09-29
 
 Inhaltlich gleich 0.7.3, geändert ist nur die Versionsnummer. `redesign`
