@@ -6,6 +6,78 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
+## [0.8.1] - 2026-10-07
+
+Redesign-Linie: enthält main bis 0.8.0 (Migrationen für Datenbanken aus oauth2 0.1.0) und die Redesign-Fixes 0.7.3/0.7.4. Die Nummer liegt über 0.8.0, damit ein Update von 0.7.x die Migrationen ausführt.
+
+### Fixed
+
+- Anrede: Die Autorisierungsseite mischte in de Du und Sie („Du bist eingeloggt als …“, aber „Zugriff auf Ihren Benutzernamen“), die Rückfrage beim Widerrufen siezte. de und de_CH duzen jetzt, de_DE siezt.
+- Sprache: „Delete“, „Revoke authorization“ (Tooltip und Sprachausgabe), „Yes“/„No“ (Sprachausgabe der Client-Liste) und „Client id is unknown“ fehlten in allen deutschen Katalogen.
+- „Deleting...“ heißt „Wird gelöscht …“ (de_DE duzte mit „Lösche...“), „Secret“ einheitlich „Geheimer Schlüssel“.
+- de_CH: zehn genutzte Texte aus de ergänzt (u. a. Weiterleitungsseite nach der Autorisierung).
+
+## [0.8.0] - 2026-09-29
+
+Inhaltlich gleich 0.7.3, geändert ist nur die Versionsnummer. `redesign`
+steht bei 0.7.4 und braucht beim Übertrag eine Nummer über 0.8.0.
+
+### Changed
+
+- **Versionsnummer auf 0.8.0 angehoben, damit die Migration aus 0.7.3 beim
+  Update läuft.** Der Kern aktualisiert eine App nach Ordnertausch und
+  `occ upgrade` nur, wenn sich mindestens die zweite Stelle ihrer
+  Versionsnummer ändert (`OC_App::shouldUpgrade`). Ändert sich nur die dritte
+  Stelle (0.7.2 → 0.7.3), trägt er die neue Nummer ein und führt weder
+  Migrationen noch Repair-Schritte aus. `Version20260926120000` blieb so
+  offen, und der verwaiste Hintergrundjob aus oauth2 0.1.0 blieb stehen, bis
+  jemand `occ migrations:migrate oauth2` von Hand aufrief. Mit 0.8.0 läuft
+  die Migration beim Update von 0.7.2 wie von 0.7.3 aus. Am Code ändert sich
+  nichts. Anders als bei einem Sprung in der dritten Stelle zeigt die Instanz
+  zwischen Ordnertausch und `occ upgrade` statt der Anmeldung die
+  Update-Seite.
+
+## [0.7.3] - 2026-09-26
+
+Nicht zu verwechseln mit 0.7.3 auf `redesign` (dort ein CSP-Fix). Beim
+Übertrag nach `redesign` bekommt dieser Stand dort eine eigene, höhere Nummer.
+
+### Fixed
+
+- **Eine aus oauth2 0.1.0 übernommene Datenbank brach das Update ab.** 0.1.0
+  (ownCloud 10.0, 2017) legte die Tabelle für Autorisierungscodes noch als
+  `oauth2_authorization_codes` an; 0.2.0 hat sie in `oauth2_auth_codes`
+  umbenannt, aber `Version20161122085340` stieg bei vorhandener
+  `oauth2_clients` einfach aus. Die Tabelle entstand so nie, und
+  `Version20201126140622` scheiterte an ihr mit `TableDoesNotExist` – damit
+  das ganze App-Update. Die fehlende Tabelle wird jetzt mit der Definition aus
+  der `database.xml` angelegt und protokolliert; die alte Tabelle bleibt
+  unberührt (Autorisierungscodes gelten zehn Minuten, zu übernehmen gibt es
+  dort nichts). Clients, Zugriffs- und Refresh-Tokens bleiben, wie sie sind.
+  Das gilt auch für eine 0.1.0-Datenbank, die unter ownCloud 10 schon auf
+  0.2.x bis 0.4.x gehoben wurde: Dort ist `Version20161122085340` bereits
+  (ohne Wirkung) verbucht, deshalb legt `Version20201126140622` die Tabelle
+  bei Bedarf selbst an.
+- **Standard-Clients doppelten einen von Hand angelegten Eintrag.**
+  `Version20170329194544` verließ sich auf den eindeutigen Namensindex, den es
+  in 0.1.0 noch nicht gab; auf der Kennung gab es nie einen. Wer den Desktop-
+  oder Mobil-Client damals selbst eingetragen hatte, bekam einen zweiten
+  Datensatz mit derselben Kennung, und `findByIdentifier()` scheiterte danach
+  an `MultipleObjectsReturnedException`. Die Migration überspringt jetzt jeden
+  Standard-Client, dessen Kennung oder Name schon vorhanden ist, und lässt den
+  vorhandenen Eintrag unverändert. Ist nur der Name belegt, fehlt danach die
+  offizielle Kennung und die jeweilige App kann sich nicht per OAuth2
+  anmelden; das meldet die Migration jetzt als Warnung (Ausgabe und
+  Protokoll) samt den `occ`-Befehlen, mit denen sich der Client nachtragen
+  lässt.
+- **Ein Hintergrundjob aus oauth2 0.1.0 blieb für immer liegen.** 0.1.0 trug
+  seinen Aufräumjob als `OC\BackgroundJob\Legacy\RegularJob` mit dem Argument
+  `["OCA\\OAuth2\\BackgroundJob\\CleanUp","run"]` ein. Die Kern-Klasse gibt es
+  nicht mehr; der Eintrag wurde bei jedem Versuch übersprungen und
+  protokolliert. Die neue Migration `Version20260926120000` entfernt genau
+  diesen Eintrag; aufgeräumt wird weiter über den Job
+  `OCA\OAuth2\BackgroundJob\CleanUp`.
+
 ## [0.7.4] - 2026-09-23
 
 ### Fixed
