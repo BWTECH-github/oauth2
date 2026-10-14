@@ -135,7 +135,7 @@ class AddClient extends Command {
 			$trusted = \filter_var($trusted, FILTER_VALIDATE_BOOLEAN);
 			$forceTrust = \filter_var($forceTrust, FILTER_VALIDATE_BOOLEAN);
 			$rURI = new URL(Utilities::removeWildcardPort($url));
-			if ($trusted && !$forceTrust && ($rURI->hostname === 'localhost' || $rURI->hostname === '127.0.0.1')) {
+			if ($trusted && !$forceTrust && Utilities::isLoopbackHost($rURI->hostname)) {
 				$output->writeln("Cannot set localhost as trusted.");
 				return 1;
 			}

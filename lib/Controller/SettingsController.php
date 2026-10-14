@@ -86,7 +86,7 @@ class SettingsController extends Controller {
 		$trusted = $this->request->getParam('trusted', null) !== null;
 
 		$rURI = new URL(Utilities::removeWildcardPort($redirectUri));
-		if (($rURI->hostname === 'localhost' || $rURI->hostname === '127.0.0.1') && $trusted) {
+		if (Utilities::isLoopbackHost($rURI->hostname) && $trusted) {
 			return $this->sendErrorResponse($this->l10n->t('Cannot set localhost as trusted.'));
 		}
 		$client->setTrusted($trusted);

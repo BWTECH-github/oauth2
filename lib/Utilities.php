@@ -28,6 +28,16 @@ use Rowbot\URL\URL;
 
 class Utilities {
 	/**
+	 * Hosts des eigenen Rechners, wie der URL-Parser sie liefert.
+	 */
+	private const LOOPBACK_HOSTS = ['localhost', '127.0.0.1', '[::1]'];
+
+	/**
+	 * Loopback-IP-Literale nach RFC 8252 §7.3.
+	 */
+	private const LOOPBACK_IPS = ['127.0.0.1', '[::1]'];
+
+	/**
 	 * Generates a random string with 64 characters.
 	 */
 	public static function generateRandom(): string {
@@ -41,14 +51,27 @@ class Utilities {
 	 * Validates a redirection URI.
 	 */
 	public static function validateRedirectUri(string $expected, string $actual, bool $allowSubdomains): bool {
-		$validatePort = true;
-		if (\strpos($expected, 'http://localhost:*') === 0) {
-			$expected = 'http://localhost' . \substr($expected, 18);
-			$validatePort = false;
-		}
+		$withoutWildcardPort = self::removeWildcardPort($expected);
+		$validatePort = $withoutWildcardPort === $expected;
+		$expected = $withoutWildcardPort;
 		try {
 			$expectedUrl = new URL($expected);
 			$actualUrl = new URL($actual);
+			// Benutzer-Info (user:pass@) nur, wenn genau sie registriert ist
+			if ($expectedUrl->username !== $actualUrl->username || $expectedUrl->password !== $actualUrl->password) {
+				return false;
+			}
+
+			// RFC 8252 §7.3: Für Loopback-Registrierungen muss jeder Port gehen -
+			// der Client bekommt ihn erst beim Anmelden vom Betriebssystem. Das
+			// gilt für die Loopback-IPs 127.0.0.1 und [::1]; localhost bleibt,
+			// wie es war (RFC 8252 §8.3 rät davon ab). Pfad und Query müssen wie
+			// registriert sein.
+			if (self::isLoopbackRegistration($expectedUrl, !$validatePort) && self::isLoopbackIpRedirect($actual, $actualUrl)) {
+				return $expectedUrl->pathname === $actualUrl->pathname
+					&& $expectedUrl->search === $actualUrl->search;
+			}
+
 			if (\strcmp($expectedUrl->protocol, $actualUrl->protocol) !== 0) {
 				return false;
 			}
@@ -75,11 +98,13 @@ class Utilities {
 		}
 	}
 
+	/**
+	 * Entfernt den Platzhalter-Port aus http://localhost:*, http://127.0.0.1:*
+	 * und http://[::1]:* (jeder Port erlaubt). Andere Hosts kennen keinen
+	 * Platzhalter; dort bleibt die URI, wie sie ist, und ist keine gültige URL.
+	 */
 	public static function removeWildcardPort(string $redirectUri): string {
-		if (\strpos($redirectUri, 'http://localhost:*') === 0) {
-			$redirectUri = 'http://localhost' . \substr($redirectUri, 18);
-		}
-		return $redirectUri;
+		return (string)\preg_replace('~^http://(localhost|127\.0\.0\.1|\[::1\]):\*(?=$|[/?#])~', 'http://$1', $redirectUri);
 	}
 
 	public static function isValidUrl(string $redirectUri): bool {
@@ -87,9 +112,58 @@ class Utilities {
 		return \filter_var($redirectUri, FILTER_VALIDATE_URL) !== false;
 	}
 
+	/**
+	 * Ob der Host (wie der URL-Parser ihn liefert) der eigene Rechner ist.
+	 * Solche Clients dürfen nicht vertrauenswürdig sein: Sie bekämen den Code
+	 * ohne Zustimmung an einen Port, auf dem jedes Programm lauschen kann.
+	 */
+	public static function isLoopbackHost(string $hostname): bool {
+		return \in_array($hostname, self::LOOPBACK_HOSTS, true);
+	}
+
+	/**
+	 * Ob die redirect_uri der Token-Anfrage dieselbe ist wie die der
+	 * Autorisierung (RFC 6749 §4.1.3). Verglichen wird die Form des
+	 * URL-Parsers: http://127.0.0.1:49152 und http://127.0.0.1:49152/ sind
+	 * dieselbe Adresse, ein anderer Port oder Host nicht.
+	 */
+	public static function isSameRedirectUri(string $authorized, string $presented): bool {
+		try {
+			return (new URL($authorized))->href === (new URL($presented))->href;
+		} catch (TypeError) {
+			return false;
+		}
+	}
+
 	// See https://tools.ietf.org/pdf/rfc7636.pdf#56
 	public static function base64url_encode(string $data): string {
 		return \rtrim(\strtr(\base64_encode($data), '+/', '-_'), '=');
+	}
+
+	/**
+	 * Loopback-Registrierung: http mit Loopback-IP (Port egal) oder
+	 * http://localhost:* - so ist der Desktop-Client eingetragen, und der
+	 * Platzhalter erlaubt dort ohnehin jeden Port. localhost mit festem Port
+	 * bleibt fest.
+	 */
+	private static function isLoopbackRegistration(URL $expectedUrl, bool $hasWildcardPort): bool {
+		if ($expectedUrl->protocol !== 'http:') {
+			return false;
+		}
+		return \in_array($expectedUrl->hostname, self::LOOPBACK_IPS, true)
+			|| ($hasWildcardPort && $expectedUrl->hostname === 'localhost');
+	}
+
+	/**
+	 * Weiterleitung auf eine Loopback-IP. Geprüft wird auch die Zeichenkette
+	 * selbst - wörtlich http://127.0.0.1 bzw. http://[::1], optional mit Port:
+	 * Der Browser folgt ihr, nicht diesem Parser, und http:127.0.0.1 etwa löst
+	 * er bei einem Server unter http relativ zu dessen Adresse auf.
+	 * Schreibweisen wie 2130706433 oder Benutzer-Info braucht kein Client.
+	 */
+	private static function isLoopbackIpRedirect(string $actual, URL $actualUrl): bool {
+		return \preg_match('~^http://(127\.0\.0\.1|\[::1\])(:[0-9]{1,5})?(?=$|[/?#])~', $actual) === 1
+			&& \in_array($actualUrl->hostname, self::LOOPBACK_IPS, true);
 	}
 
 	private static function validateDomain(URL $expectedUrl, URL $actualUrl, bool $allowSubdomains): bool {

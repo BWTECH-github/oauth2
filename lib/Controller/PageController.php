@@ -228,6 +228,8 @@ class PageController extends Controller {
 				$authorizationCode->resetExpires();
 				$authorizationCode->setCodeChallenge($code_challenge);
 				$authorizationCode->setCodeChallengeMethod($code_challenge_method);
+				// der Token-Endpunkt verlangt genau diese URI (RFC 6749 §4.1.3)
+				$authorizationCode->setRedirectUri(\urldecode($redirect_uri));
 				$this->authorizationCodeMapper->insert($authorizationCode);
 
 				$result = \urldecode($redirect_uri);

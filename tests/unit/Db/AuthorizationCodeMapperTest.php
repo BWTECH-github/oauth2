@@ -128,6 +128,24 @@ class AuthorizationCodeMapperTest extends TestCase {
 		$this->assertEquals($this->expires, $authorizationCode->getExpires());
 	}
 
+	public function testRedirectUriIsStoredWithTheCode(): void {
+		$authorizationCode = new AuthorizationCode();
+		$authorizationCode->setCode('yUZkVZUf1a6FM9pefmkcVv2IzvsFZaYzuGF62AqVzMJs4yr3M3VJaCNXCy4QZI7u');
+		$authorizationCode->setClientId(1);
+		$authorizationCode->setUserId('max');
+		$authorizationCode->resetExpires();
+		$authorizationCode->setRedirectUri('http://127.0.0.1:49152');
+		$inserted = $this->authorizationCodeMapper->insert($authorizationCode);
+
+		/** @var AuthorizationCode $found */
+		$found = $this->authorizationCodeMapper->findByCode('yUZkVZUf1a6FM9pefmkcVv2IzvsFZaYzuGF62AqVzMJs4yr3M3VJaCNXCy4QZI7u');
+		$this->authorizationCodeMapper->delete($inserted);
+
+		$this->assertSame('http://127.0.0.1:49152', $found->getRedirectUri());
+		// Codes von vor dem Update tragen keine URI
+		$this->assertNull($this->authorizationCodeMapper->findByCode($this->code)->getRedirectUri());
+	}
+
 	/**
 	 */
 	public function testFindByCodeDoesNotExistException() {

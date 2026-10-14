@@ -92,6 +92,9 @@ class OAuthApiControllerTest extends TestCase {
 	/** @var String $refreshToken */
 	private $authorizationSuccessfulMessageUrl;
 
+	/** @var Client|null Desktop-Client aus addDesktopClientWithCode() */
+	private $desktopClient;
+
 	public function setUp(): void {
 		parent::setUp();
 
@@ -175,6 +178,11 @@ class OAuthApiControllerTest extends TestCase {
 		$this->clientMapper->delete($this->client2);
 		$this->authorizationCodeMapper->delete($this->authorizationCode);
 		$this->refreshTokenMapper->delete($this->refreshToken);
+		if ($this->desktopClient !== null) {
+			$this->authorizationCodeMapper->deleteByClient($this->desktopClient->getId());
+			$this->clientMapper->delete($this->desktopClient);
+			$this->desktopClient = null;
+		}
 	}
 
 	public function testGenerateTokenWithUnknownGrantType() {
@@ -650,5 +658,122 @@ class OAuthApiControllerTest extends TestCase {
 		$this->assertNotEmpty($json->error);
 		$this->assertEquals('invalid_request', $json->error);
 		$this->assertEquals('Code challenge method invalid not supported', $json->error_description);
+	}
+
+	/**
+	 * Desktop-Client, wie ihn Version20170329194544 einträgt (http://localhost:*),
+	 * mit einem Code für die angegebene redirect_uri (null: Code von vor dem
+	 * Update, ohne gespeicherte URI). Meldet sich als dieser Client an.
+	 */
+	private function addDesktopClientWithCode(?string $redirectUri): AuthorizationCode {
+		$client = new Client();
+		$client->setIdentifier('xdXOt13JKxym1B1QcEncf2XDkLAexMBFwiT9j6EfhhHFJhs2KM9jbjTmf8JBXE69');
+		$client->setSecret('UBntmLjC2yYCeHwsyj73Uwo9TAaecAetRwMw0xYcvNL9yRdLSUi0hUAHfvCHFeFh');
+		$client->setRedirectUri('http://localhost:*');
+		$client->setName('Desktop Client');
+		$client = $this->clientMapper->insert($client);
+		$this->desktopClient = $client;
+
+		$authorizationCode = new AuthorizationCode();
+		$authorizationCode->setCode(\str_pad('desktop-loopback-code', 64, 'x'));
+		$authorizationCode->setClientId($client->getId());
+		$authorizationCode->setUserId($this->userId);
+		$authorizationCode->resetExpires();
+		if ($redirectUri !== null) {
+			$authorizationCode->setRedirectUri($redirectUri);
+		}
+		$authorizationCode = $this->authorizationCodeMapper->insert($authorizationCode);
+
+		$_SERVER['PHP_AUTH_USER'] = $client->getIdentifier();
+		$_SERVER['PHP_AUTH_PW'] = $client->getSecret();
+		$userMock = $this->createMock(IUser::class);
+		$userMock->method('isEnabled')->willReturn(true);
+		$this->userManager->method('get')->willReturn($userMock);
+
+		return $authorizationCode;
+	}
+
+	/**
+	 * Passt zur Registrierung, ist aber nicht die URI der Autorisierung.
+	 */
+	public function providesRedirectUrisOtherThanTheAuthorization(): array {
+		return [
+			'anderer Port' => ['http://127.0.0.1:49152', 'http://127.0.0.1:49153'],
+			'andere Loopback-Adresse' => ['http://127.0.0.1:49152', 'http://[::1]:49152'],
+			'localhost statt IP' => ['http://127.0.0.1:49152', 'http://localhost:49152'],
+			'IP statt localhost' => ['http://localhost:49152', 'http://127.0.0.1:49152'],
+			'localhost anderer Port' => ['http://localhost:49152', 'http://localhost:49153'],
+		];
+	}
+
+	/**
+	 * RFC 6749 §4.1.3: Der Token-Endpunkt verlangt dieselbe redirect_uri wie
+	 * die Autorisierung, nicht nur eine, die zur Registrierung passt.
+	 *
+	 * @dataProvider providesRedirectUrisOtherThanTheAuthorization
+	 */
+	public function testGenerateTokenRequiresTheRedirectUriOfTheAuthorization(string $authorizedFor, string $presented): void {
+		$authorizationCode = $this->addDesktopClientWithCode($authorizedFor);
+
+		$result = $this->controller->generateToken('authorization_code', $authorizationCode->getCode(), $presented);
+
+		$json = \json_decode($result->render());
+		$this->assertEquals(400, $result->getStatus());
+		$this->assertEquals('invalid_grant', $json->error);
+		$this->assertEquals('auth grant redirect uri mismatch', $json->error_description);
+		$this->assertCount(1, $this->accessTokenMapper->findAll(), 'kein neues Zugriffstoken');
+	}
+
+	public function providesTheRedirectUriOfTheAuthorization(): array {
+		return [
+			'127.0.0.1' => ['http://127.0.0.1:49152', 'http://127.0.0.1:49152'],
+			'127.0.0.1, gleichwertig geschrieben' => ['http://127.0.0.1:49152', 'http://127.0.0.1:49152/'],
+			'[::1]' => ['http://[::1]:49152', 'http://[::1]:49152'],
+			'localhost wie bisher' => ['http://localhost:49152', 'http://localhost:49152'],
+		];
+	}
+
+	/**
+	 * @dataProvider providesTheRedirectUriOfTheAuthorization
+	 */
+	public function testGenerateTokenWithTheRedirectUriOfTheAuthorization(string $authorizedFor, string $presented): void {
+		$authorizationCode = $this->addDesktopClientWithCode($authorizedFor);
+
+		$result = $this->controller->generateToken('authorization_code', $authorizationCode->getCode(), $presented);
+
+		$json = \json_decode($result->render());
+		$this->assertEquals(200, $result->getStatus(), \json_encode($json));
+		$this->assertEquals(64, \strlen($json->access_token));
+		$this->assertEquals(64, \strlen($json->refresh_token));
+		$remaining = \array_map(static function (AuthorizationCode $code) {
+			return $code->getCode();
+		}, $this->authorizationCodeMapper->findAll());
+		$this->assertNotContains($authorizationCode->getCode(), $remaining, 'Code ist verbraucht');
+	}
+
+	/**
+	 * Codes von vor dem Update tragen keine redirect_uri; für sie gilt bis zum
+	 * Ablauf (zehn Minuten) nur die Prüfung gegen die Registrierung - jetzt
+	 * auch mit Loopback-Adresse.
+	 */
+	public function testGenerateTokenWithCodeFromBeforeTheUpdate(): void {
+		$authorizationCode = $this->addDesktopClientWithCode(null);
+
+		$result = $this->controller->generateToken('authorization_code', $authorizationCode->getCode(), 'http://127.0.0.1:49152');
+
+		$json = \json_decode($result->render());
+		$this->assertEquals(200, $result->getStatus(), \json_encode($json));
+		$this->assertEquals(64, \strlen($json->access_token));
+	}
+
+	public function testGenerateTokenWithCodeFromBeforeTheUpdateStillChecksTheRegistration(): void {
+		$authorizationCode = $this->addDesktopClientWithCode(null);
+
+		$result = $this->controller->generateToken('authorization_code', $authorizationCode->getCode(), 'http://evil.com:49152');
+
+		$json = \json_decode($result->render());
+		$this->assertEquals(400, $result->getStatus());
+		$this->assertEquals('invalid_grant', $json->error);
+		$this->assertEquals('auth grant redirect uri invalid', $json->error_description);
 	}
 }
