@@ -35,6 +35,8 @@ use OCP\AppFramework\Db\Entity;
  * @method void setExpires(int $value)
  * @method void setCodeChallenge(string $codeChallenge)
  * @method void setCodeChallengeMethod(string $codeChallengeMethod)
+ * @method string|null getRedirectUri() null bei Codes von vor dem Update
+ * @method void setRedirectUri(string $redirectUri)
  */
 class AuthorizationCode extends Entity {
 	public const EXPIRATION_TIME = 600;
@@ -45,6 +47,7 @@ class AuthorizationCode extends Entity {
 	protected ?int $expires = null;
 	protected ?string $codeChallenge = null;
 	protected ?string $codeChallengeMethod = null;
+	protected ?string $redirectUri = null;
 
 	public function __construct() {
 		$this->addType('id', 'int');
@@ -54,6 +57,7 @@ class AuthorizationCode extends Entity {
 		$this->addType('expires', 'int');
 		$this->addType('code_challenge', 'string');
 		$this->addType('code_challenge_method', 'string');
+		$this->addType('redirect_uri', 'string');
 	}
 
 	/**

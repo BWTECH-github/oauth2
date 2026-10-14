@@ -68,10 +68,10 @@ Run from the owncloud.online root with the web user, e.g. `sudo -u www-data php 
 | `name`              | yes      | Display name shown on the consent screen |
 | `client-id`         | yes      | Client identifier (>= 32 chars) |
 | `client-secret`     | yes      | Client secret (>= 32 chars) |
-| `redirect-url`      | yes      | Redirect URI; `http://localhost:*` allows any port |
+| `redirect-url`      | yes      | Redirect URI; `http://localhost:*` allows any port, loopback IPs any port as well (see [Loopback redirects](#loopback-redirects-desktop-clients)) |
 | `allow-sub-domains` | no       | `true` / `false` (default `false`) |
 | `trusted`           | no       | `true` / `false` — skip consent screen (default `false`) |
-| `force-trust`       | no       | `true` / `false` — allow trusting `localhost` / `127.0.0.1` |
+| `force-trust`       | no       | `true` / `false` — allow trusting `localhost` / `127.0.0.1` / `[::1]` |
 
 ### `oauth2:list-clients`
 
@@ -102,6 +102,28 @@ sudo -u www-data php occ oauth2:add-client \
   "$(openssl rand -hex 32)" \
   "http://localhost:*"
 ```
+
+### Loopback redirects (desktop clients)
+
+Native apps receive the code on a local port that the operating system assigns
+at sign-in. Following [RFC 8252 §7.3](https://www.rfc-editor.org/rfc/rfc8252#section-7.3),
+a client with a loopback registration may return to the loopback IP literals
+with **any port**:
+
+| Registered `redirect-url` | Accepted |
+| ------------------------- | -------- |
+| `http://localhost:*` (the built-in Desktop Client) | `http://localhost:<port>`, `http://127.0.0.1:<port>`, `http://[::1]:<port>` |
+| `http://127.0.0.1` or `http://[::1]`, with or without a port or `:*`, optionally with a path | `http://127.0.0.1:<port>` and `http://[::1]:<port>` |
+| `http://localhost:<port>` (fixed port) | exactly that URI, as before |
+
+Path and query must be exactly as registered. Not accepted: other hosts,
+`https` or other schemes for this rule, user info (`user@…`) in the URI, and
+non-canonical spellings such as `http://2130706433` or `http:127.0.0.1`. Ports
+stay fixed for every non-loopback registration.
+
+The token request must carry the same `redirect_uri` as the authorization
+request ([RFC 6749 §4.1.3](https://www.rfc-editor.org/rfc/rfc6749#section-4.1.3));
+equivalent spellings such as a trailing `/` after the port count as the same.
 
 ### Authorization-code flow (with PKCE)
 
@@ -149,7 +171,8 @@ Access tokens expire after one hour (`AccessToken::EXPIRATION_TIME = 3600`); aut
 | Symptom                                                              | Likely cause / Fix |
 | -------------------------------------------------------------------- | ------------------ |
 | `invalid_client` on token endpoint                                   | Wrong client id/secret, or `PHP_AUTH_USER` not forwarded by your reverse proxy. Ensure Apache `SetEnvIf Authorization` / nginx `proxy_set_header Authorization` is in place. |
-| `invalid_grant: auth grant redirect uri invalid`                     | The `redirect_uri` in the token request does not match the registered one — protocol, port, host, path, and query must match. |
+| `invalid_grant: auth grant redirect uri invalid`                     | The `redirect_uri` in the token request does not match the registered one — protocol, port, host, path, and query must match (loopback: see [Loopback redirects](#loopback-redirects-desktop-clients)). |
+| `invalid_grant: auth grant redirect uri mismatch`                    | The `redirect_uri` in the token request differs from the one used in the authorization request (another port or loopback address, for example). Send the same value in both requests. |
 | `invalid_grant: code verifier invalid`                               | PKCE verifier doesn't match the challenge. Re-check `S256` encoding (`base64url(sha256(verifier))`, no padding). |
 | Desktop client 2.4.2 stuck in refresh loop                           | Known interop bug; the app already returns HTTP 200 on refresh failure for `mirall/2.4.2` to break the loop. Update the client. |
 | Bearer token rejected on WebDAV after IDP migration                  | `OAuth2Test`-shaped session leak; clear the user's session cookies and retry. |

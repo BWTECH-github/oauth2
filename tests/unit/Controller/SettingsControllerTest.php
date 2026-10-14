@@ -195,6 +195,59 @@ class SettingsControllerTest extends TestCase {
 		}
 	}
 
+	public function provideLoopbackRedirectUris(): array {
+		return [
+			['http://localhost:*'],
+			['http://127.0.0.1/cb'],
+			['http://127.0.0.1:*'],
+			['http://[::1]/cb'],
+			['http://[::1]:*'],
+		];
+	}
+
+	/**
+	 * Loopback-Clients (jetzt mit beliebigem Port, RFC 8252 §7.3) lassen sich
+	 * anlegen, aber nicht als vertrauenswürdig: Sie bekämen den Code ohne
+	 * Zustimmung an jeden Port des Rechners.
+	 *
+	 * @dataProvider provideLoopbackRedirectUris
+	 */
+	public function testAddClientWithLoopbackRedirect(string $redirectUri): void {
+		$this->clientMapper->deleteAll();
+		$this->request->method('getParam')->willReturnMap([
+			['redirect_uri', '', $redirectUri],
+			['name', '', 'Loopback'],
+			['allow_subdomains', null, null],
+			['trusted', null, null],
+		]);
+
+		$result = $this->controller->addClient();
+
+		self::assertEquals('success', $result->getData()['status']);
+		self::assertCount(1, $this->clientMapper->findAll());
+		self::assertEquals($redirectUri, $this->clientMapper->findAll()[0]->getRedirectUri());
+		self::assertFalse($this->clientMapper->findAll()[0]->getTrusted());
+	}
+
+	/**
+	 * @dataProvider provideLoopbackRedirectUris
+	 */
+	public function testAddClientRejectsTrustedLoopbackRedirect(string $redirectUri): void {
+		$this->clientMapper->deleteAll();
+		$this->request->method('getParam')->willReturnMap([
+			['redirect_uri', '', $redirectUri],
+			['name', '', 'Loopback'],
+			['allow_subdomains', null, null],
+			['trusted', null, 'on'],
+		]);
+
+		$result = $this->controller->addClient();
+
+		self::assertEquals('error', $result->getData()['status']);
+		self::assertEquals('Cannot set localhost as trusted.', $result->getData()['errorMessage']);
+		self::assertCount(0, $this->clientMapper->findAll());
+	}
+
 	public function provideClientId(): array {
 		// Data providers are run before the class is configured.
 		// That's why we need a closure if we want to access $this->smth->property

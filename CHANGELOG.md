@@ -6,6 +6,61 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
+## [0.9.1] - 2026-10-14
+
+Redesign-Linie: enthält main bis 0.9.0 (Loopback-Weiterleitung nach RFC 8252,
+dieselbe `redirect_uri` am Token-Endpunkt, Migration `Version20261014120000`)
+und die Redesign-Fixes bis 0.8.1. Die Nummer liegt über 0.9.0; der Sprung von
+0.8.1 in der zweiten Stelle lässt den Kern die neue Migration ausführen.
+
+## [0.9.0] - 2026-10-14
+
+Server-Seite für den Desktop-Client, der nach RFC 8252 auf
+`http://127.0.0.1:<Port>` statt `http://localhost:<Port>` zurückleiten soll
+(Client-Audit M5). Diese Version muss auf dem Server sein, bevor ein Client
+mit der Umstellung ausgeliefert wird – sonst endet dessen Anmeldung auf der
+Fehlerseite. Die zweite Stelle steigt wegen der neuen Migration: Bei einem
+Sprung nur in der dritten Stelle führt der Kern sie beim Update nicht aus
+(`OC_App::shouldUpgrade`, siehe 0.8.0).
+
+### Added
+
+- **Loopback-Weiterleitung mit beliebigem Port (RFC 8252 §7.3).** Clients mit
+  Loopback-Registrierung – `http://localhost:*` wie der eingebaute
+  Desktop-Client, `http://127.0.0.1` oder `http://[::1]` – dürfen auf
+  `http://127.0.0.1:<Port>` und `http://[::1]:<Port>` zurückleiten; Pfad und
+  Query müssen wie registriert sein. Die vorhandene Registrierung des
+  Desktop-Clients bleibt, wie sie ist. `localhost` selbst verhält sich wie
+  bisher, ein fester localhost-Port bleibt fest, und für alle anderen Hosts
+  ändert sich nichts.
+- `http://127.0.0.1:*` und `http://[::1]:*` lassen sich wie
+  `http://localhost:*` registrieren.
+
+### Security
+
+- **Der Token-Endpunkt verlangt dieselbe `redirect_uri` wie die
+  Autorisierung (RFC 6749 §4.1.3).** Bisher genügte eine URI, die zur
+  Registrierung passte – bei `http://localhost:*` also jeder Port, mit
+  Subdomain-Erlaubnis jede Subdomain. Der Code merkt sich jetzt die URI
+  seiner Autorisierung (neue Spalte `redirect_uri` in `oauth2_auth_codes`,
+  Migration `Version20261014120000`); eine andere lehnt der Token-Endpunkt mit
+  `invalid_grant` / `auth grant redirect uri mismatch` ab. Gleichwertige
+  Schreibweisen wie `http://127.0.0.1:49152` und `http://127.0.0.1:49152/`
+  gelten als dieselbe. Codes von vor dem Update tragen keine URI und werden
+  bis zu ihrem Ablauf (zehn Minuten) nur gegen die Registrierung geprüft.
+- **Benutzer-Info in der `redirect_uri` wird abgelehnt** (`http://user@…`),
+  außer sie ist genau so registriert.
+- **Loopback-Clients mit `[::1]` lassen sich nur noch mit `force-trust` als
+  vertrauenswürdig eintragen**, wie bisher `localhost` und `127.0.0.1`. Mit
+  beliebigem Port bekämen sie den Code ohne Zustimmung an jeden Port des
+  Rechners.
+
+### Changed
+
+- Der Platzhalter-Port greift nur noch, wenn auf `:*` das Ende, `/`, `?`
+  oder `#` folgt. `http://localhost:*.example.com` las die App bisher als
+  Host `localhost.example.com` mit beliebigem Port.
+
 ## [0.8.1] - 2026-10-07
 
 Redesign-Linie: enthält main bis 0.8.0 (Migrationen für Datenbanken aus oauth2 0.1.0) und die Redesign-Fixes 0.7.3/0.7.4. Die Nummer liegt über 0.8.0, damit ein Update von 0.7.x die Migrationen ausführt.

@@ -372,4 +372,107 @@ class PageControllerTest extends TestCase {
 		self::assertStringNotContainsString('<script>x', $html);
 		self::assertStringNotContainsString('<b>client</b>', $html);
 	}
+
+	/**
+	 * Der Desktop-Client, wie ihn Version20170329194544 einträgt.
+	 */
+	private function addDesktopClient(): Client {
+		$client = new Client();
+		$client->setIdentifier('xdXOt13JKxym1B1QcEncf2XDkLAexMBFwiT9j6EfhhHFJhs2KM9jbjTmf8JBXE69');
+		$client->setSecret('UBntmLjC2yYCeHwsyj73Uwo9TAaecAetRwMw0xYcvNL9yRdLSUi0hUAHfvCHFeFh');
+		$client->setRedirectUri('http://localhost:*');
+		$client->setName('Desktop Client');
+		$client->setAllowSubdomains(false);
+		return $this->clientMapper->insert($client);
+	}
+
+	/**
+	 * RFC 8252 §7.3: Rückleitung auf die Loopback-IP mit beliebigem Port,
+	 * localhost wie bisher.
+	 */
+	public function providesLoopbackRedirectsOfTheDesktopClient(): array {
+		return [
+			'127.0.0.1' => ['http://127.0.0.1:49152'],
+			'127.0.0.1 mit Schrägstrich' => ['http://127.0.0.1:50123/'],
+			'[::1]' => ['http://[::1]:49152'],
+			'localhost wie bisher' => ['http://localhost:49152'],
+		];
+	}
+
+	public function providesRejectedRedirectsOfTheDesktopClient(): array {
+		return [
+			'anderer Pfad' => ['http://127.0.0.1:49152/evil'],
+			'https' => ['https://127.0.0.1:49152'],
+			'Benutzer-Info' => ['http://user@127.0.0.1:49152'],
+			'fremder Host hinter Benutzer-Info' => ['http://127.0.0.1:49152@evil.com/'],
+			'fremder Host' => ['http://evil.com:49152'],
+		];
+	}
+
+	/**
+	 * @dataProvider providesLoopbackRedirectsOfTheDesktopClient
+	 */
+	public function testAuthorizeAsksForConsentOnLoopbackRedirectOfTheDesktopClient(string $redirectUri): void {
+		$desktop = $this->addDesktopClient();
+
+		$result = $this->controller->authorize('code', $desktop->getIdentifier(), $redirectUri, 'state');
+
+		$this->clientMapper->delete($desktop);
+		self::assertInstanceOf(TemplateResponse::class, $result);
+		self::assertEquals('authorize', $result->getTemplateName());
+	}
+
+	/**
+	 * @dataProvider providesRejectedRedirectsOfTheDesktopClient
+	 */
+	public function testAuthorizeRejectsOtherRedirectsOfTheDesktopClient(string $redirectUri): void {
+		$desktop = $this->addDesktopClient();
+
+		$result = $this->controller->authorize('code', $desktop->getIdentifier(), $redirectUri, 'state');
+
+		$this->clientMapper->delete($desktop);
+		self::assertInstanceOf(TemplateResponse::class, $result);
+		self::assertEquals('authorize-error', $result->getTemplateName());
+		self::assertEquals(['client_name' => 'Desktop Client'], $result->getParams());
+	}
+
+	/**
+	 * Der Code merkt sich die redirect_uri, damit der Token-Endpunkt dieselbe
+	 * verlangen kann (RFC 6749 §4.1.3).
+	 *
+	 * @dataProvider providesLoopbackRedirectsOfTheDesktopClient
+	 */
+	public function testGenerateAuthorizationCodeRedirectsToTheLoopbackAndRemembersTheUri(string $redirectUri): void {
+		$desktop = $this->addDesktopClient();
+
+		$result = $this->controller->generateAuthorizationCode('code', $desktop->getIdentifier(), $redirectUri, 'state');
+
+		self::assertInstanceOf(RedirectResponse::class, $result);
+		[$url, $query] = \explode('?', $result->getRedirectURL(), 2);
+		self::assertSame($redirectUri, $url);
+		\parse_str($query, $parameters);
+		self::assertSame('state', $parameters['state']);
+		/** @var AuthorizationCode $authorizationCode */
+		$authorizationCode = $this->authorizationCodeMapper->findByCode($parameters['code']);
+		$this->authorizationCodeMapper->deleteByClient($desktop->getId());
+		$this->clientMapper->delete($desktop);
+		self::assertSame($redirectUri, $authorizationCode->getRedirectUri());
+	}
+
+	/**
+	 * @dataProvider providesRejectedRedirectsOfTheDesktopClient
+	 */
+	public function testGenerateAuthorizationCodeIssuesNoCodeForOtherRedirectsOfTheDesktopClient(string $redirectUri): void {
+		$desktop = $this->addDesktopClient();
+		$before = \count($this->authorizationCodeMapper->findAll());
+
+		$result = $this->controller->generateAuthorizationCode('code', $desktop->getIdentifier(), $redirectUri, 'state');
+
+		$after = \count($this->authorizationCodeMapper->findAll());
+		$this->authorizationCodeMapper->deleteByClient($desktop->getId());
+		$this->clientMapper->delete($desktop);
+		self::assertInstanceOf(RedirectResponse::class, $result);
+		self::assertEquals(OC_Util::getDefaultPageUrl(), $result->getRedirectURL());
+		self::assertSame($before, $after);
+	}
 }

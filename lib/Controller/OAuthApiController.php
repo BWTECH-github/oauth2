@@ -152,6 +152,17 @@ class OAuthApiController extends ApiController {
 					return new JSONResponse(['error' => 'invalid_grant', 'error_description' => 'auth grant redirect uri invalid'], Http::STATUS_BAD_REQUEST);
 				}
 
+				// RFC 6749 §4.1.3: dieselbe redirect_uri wie bei der Autorisierung,
+				// nicht nur eine, die zur Registrierung passt - mit Loopback-Port
+				// (RFC 8252 §7.3) oder Subdomains passen viele. Codes von vor dem
+				// Update tragen keine URI; für sie gilt bis zum Ablauf nur die
+				// Registrierung.
+				$authorizedRedirectUri = $authorizationCode->getRedirectUri();
+				if ($authorizedRedirectUri !== null && !Utilities::isSameRedirectUri($authorizedRedirectUri, \urldecode($redirect_uri))) {
+					$this->logger->debug("auth grant redirect uri mismatch: {$redirect_uri} is not {$authorizedRedirectUri}", ['app' => __CLASS__]);
+					return new JSONResponse(['error' => 'invalid_grant', 'error_description' => 'auth grant redirect uri mismatch'], Http::STATUS_BAD_REQUEST);
+				}
+
 				try {
 					if (!$authorizationCode->isCodeVerifierValid($code_verifier)) {
 						// Do not log the PKCE code verifier itself — it is a per-flow secret.
