@@ -8,11 +8,13 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
 ## [0.9.2] - 2026-10-16
 
-Redesign-Linie: übernimmt aus main den Fix der Anmeldekarte (unter 0.9.0,
+Redesign-Linie: übernimmt aus main zwei Fixes der Anmeldeseite (unter 0.9.0,
 Fixed). Das Kopfelement `<data key="oauth2" …>` bekommt einen leeren Text,
-damit auch Kerne ohne `OC_Template::renderHeaders()` es mit Endtag ausgeben
-und die Anmeldekarte mittig bleibt. Ohne neue Migration genügt der Sprung in
-der dritten Stelle.
+damit auch Kerne ohne `OC_Template::renderHeaders()` – darunter der
+Redesign-Kern bis zur Übernahme – es mit Endtag ausgeben und die
+Anmeldekarte mittig bleibt. Eine verfälschte Rücksprungadresse
+(`redirect_url[]=…`, `client_id[]=…` oder `user[]=…`) führt nicht mehr zu
+HTTP 500. Ohne neue Migration genügt der Sprung in der dritten Stelle.
 
 ## [0.9.1] - 2026-10-14
 
@@ -74,13 +76,21 @@ Sprung nur in der dritten Stelle führt der Kern sie beim Update nicht aus
 - **Die Anmeldekarte bleibt mittig, wenn ein Client die Anmeldung öffnet.**
   Für `js/login.js` legt die App auf der Anmeldeseite das Kopfelement
   `<data key="oauth2" …>` ab, bisher ohne Text. Kerne ohne
-  `OC_Template::renderHeaders()` (Core bis 11.0.22, DEV bis 11.0.37) geben es
+  `OC_Template::renderHeaders()` – Core- und SaaS-Tags bis v11.0.22,
+  DEV-Tags bis v11.0.37 und der Redesign-Kern bis zur Übernahme – geben es
   dann als `<data …/>` aus. Selbstschließend sind in HTML aber nur leere
   Elemente wie `<meta>`; `<data>` blieb offen, umschloss die Anmeldekarte, und
   die stand links oben statt mittig – etwa sobald sich der Desktop-Client
   anmeldete. Die App übergibt jetzt einen leeren Text, jeder Kern gibt
   `<data …></data>` aus; auf Kernen mit `renderHeaders()` ist die Ausgabe
   unverändert.
+- **Die Anmeldeseite bricht bei verfälschter Rücksprungadresse nicht mehr mit
+  HTTP 500 ab.** Mit `redirect_url[]=…` oder mit `client_id[]=…` bzw.
+  `user[]=…` in der `redirect_url` endete der Aufruf in einem Serverfehler
+  (TypeError in `urldecode()`, InvalidArgumentException aus
+  `ClientMapper::findByIdentifier()`), noch bevor sich jemand anmelden konnte.
+  Solche Werte übergeht die App jetzt; die Anmeldeseite erscheint wie ohne
+  sie.
 
 ## [0.8.1] - 2026-10-07
 
