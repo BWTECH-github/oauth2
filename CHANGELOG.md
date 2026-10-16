@@ -59,13 +59,21 @@ Sprung nur in der dritten Stelle führt der Kern sie beim Update nicht aus
 - **Die Anmeldekarte bleibt mittig, wenn ein Client die Anmeldung öffnet.**
   Für `js/login.js` legt die App auf der Anmeldeseite das Kopfelement
   `<data key="oauth2" …>` ab, bisher ohne Text. Kerne ohne
-  `OC_Template::renderHeaders()` (Core bis 11.0.22, DEV bis 11.0.37) geben es
+  `OC_Template::renderHeaders()` – Core- und SaaS-Tags bis v11.0.22,
+  DEV-Tags bis v11.0.37 und der Redesign-Kern bis zur Übernahme – geben es
   dann als `<data …/>` aus. Selbstschließend sind in HTML aber nur leere
   Elemente wie `<meta>`; `<data>` blieb offen, umschloss die Anmeldekarte, und
   die stand links oben statt mittig – etwa sobald sich der Desktop-Client
   anmeldete. Die App übergibt jetzt einen leeren Text, jeder Kern gibt
   `<data …></data>` aus; auf Kernen mit `renderHeaders()` ist die Ausgabe
   unverändert.
+- **Die Anmeldeseite bricht bei verfälschter Rücksprungadresse nicht mehr mit
+  HTTP 500 ab.** Mit `redirect_url[]=…` oder mit `client_id[]=…` bzw.
+  `user[]=…` in der `redirect_url` endete der Aufruf in einem Serverfehler
+  (TypeError in `urldecode()`, InvalidArgumentException aus
+  `ClientMapper::findByIdentifier()`), noch bevor sich jemand anmelden konnte.
+  Solche Werte übergeht die App jetzt; die Anmeldeseite erscheint wie ohne
+  sie.
 
 ## [0.8.0] - 2026-09-29
 

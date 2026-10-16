@@ -79,7 +79,10 @@ class Application extends App {
 			return;
 		}
 		$redirectUrl = $request->getParam('redirect_url');
-		if ($redirectUrl === null) {
+		// Nur Zeichenketten auswerten: redirect_url[]=… kommt als Array an,
+		// urldecode() bräche mit einem TypeError ab, und statt der
+		// Anmeldeseite käme HTTP 500.
+		if (!\is_string($redirectUrl)) {
 			return;
 		}
 
@@ -95,7 +98,9 @@ class Application extends App {
 		}
 		$params = [];
 		\parse_str($urlParts['query'], $params);
-		if (!isset($params['client_id'])) {
+		// client_id[]=… ergibt ein Array, findByIdentifier() wirft dafür eine
+		// InvalidArgumentException; solche Eingaben übergehen.
+		if (!isset($params['client_id']) || !\is_string($params['client_id'])) {
 			return;
 		}
 		/** @var ClientMapper $mapper */
@@ -106,7 +111,8 @@ class Application extends App {
 			Util::addScript('oauth2', 'login');
 			Util::addStyle('oauth2', 'login');
 			$data = ['key' => 'oauth2', 'client' => $client->getName()];
-			if (isset($params['user'])) {
+			// user[]=… ebenso: kein Anmeldehinweis statt eines Arrays im Kopfelement
+			if (isset($params['user']) && \is_string($params['user'])) {
 				$u = OC::$server->getUserManager()->get($params['user']);
 				if ($u !== null) {
 					$data['login_hint'] = $u->getUserName();
@@ -116,7 +122,8 @@ class Application extends App {
 				}
 			}
 			// Leerer Text statt null: Kerne ohne OC_Template::renderHeaders()
-			// (Core bis 11.0.22, DEV bis 11.0.37) geben ein Kopfelement ohne
+			// – Core- und SaaS-Tags bis v11.0.22, DEV-Tags bis v11.0.37 und der
+			// Redesign-Kern bis zur Übernahme – geben ein Kopfelement ohne
 			// Text als <data …/> aus. Selbstschließend sind in HTML nur void
 			// elements, <data> bliebe offen und umschlösse die Anmeldekarte,
 			// die dann links oben statt mittig steht. Mit '' wird daraus bei
