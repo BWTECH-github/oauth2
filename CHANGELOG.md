@@ -54,6 +54,19 @@ Sprung nur in der dritten Stelle führt der Kern sie beim Update nicht aus
   oder `#` folgt. `http://localhost:*.example.com` las die App bisher als
   Host `localhost.example.com` mit beliebigem Port.
 
+### Fixed
+
+- **Die Anmeldekarte bleibt mittig, wenn ein Client die Anmeldung öffnet.**
+  Für `js/login.js` legt die App auf der Anmeldeseite das Kopfelement
+  `<data key="oauth2" …>` ab, bisher ohne Text. Kerne ohne
+  `OC_Template::renderHeaders()` (Core bis 11.0.22, DEV bis 11.0.37) geben es
+  dann als `<data …/>` aus. Selbstschließend sind in HTML aber nur leere
+  Elemente wie `<meta>`; `<data>` blieb offen, umschloss die Anmeldekarte, und
+  die stand links oben statt mittig – etwa sobald sich der Desktop-Client
+  anmeldete. Die App übergibt jetzt einen leeren Text, jeder Kern gibt
+  `<data …></data>` aus; auf Kernen mit `renderHeaders()` ist die Ausgabe
+  unverändert.
+
 ## [0.8.0] - 2026-09-29
 
 Inhaltlich gleich 0.7.3, geändert ist nur die Versionsnummer. `redesign`

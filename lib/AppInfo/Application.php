@@ -115,7 +115,13 @@ class Application extends App {
 					$data['login_hint'] = $params['user'];
 				}
 			}
-			Util::addHeader('data', $data);
+			// Leerer Text statt null: Kerne ohne OC_Template::renderHeaders()
+			// (Core bis 11.0.22, DEV bis 11.0.37) geben ein Kopfelement ohne
+			// Text als <data …/> aus. Selbstschließend sind in HTML nur void
+			// elements, <data> bliebe offen und umschlösse die Anmeldekarte,
+			// die dann links oben statt mittig steht. Mit '' wird daraus bei
+			// jedem Kern <data …></data>.
+			Util::addHeader('data', $data, '');
 		} catch (DoesNotExistException) {
 			// ignore - the given client id is not known
 		}
