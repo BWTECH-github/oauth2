@@ -24,7 +24,9 @@ use OCA\OAuth2\AppInfo\Application;
 use OCA\OAuth2\Db\Client;
 use OCA\OAuth2\Db\ClientMapper;
 use OCA\OAuth2\Hooks\UserHooks;
+use OCP\ILogger;
 use OCP\IRequest;
+use OCP\IUserManager;
 use Test\TestCase;
 
 /**
@@ -32,7 +34,8 @@ use Test\TestCase;
  * <data key="oauth2" …> für js/login.js ab. Ohne Text geben Kerne ohne
  * OC_Template::renderHeaders() es als <data …/> aus; der HTML-Parser lässt
  * <data> offen, es umschließt die Anmeldekarte und schiebt sie nach links
- * oben. Eingaben aus der Adresse, die keine Zeichenketten sind, dürfen die
+ * oben. Eingaben aus der Adresse, die keine Zeichenketten oder kein gültiges
+ * UTF-8 sind, und Fehler der Abfragen von Client und Konto dürfen die
  * Anmeldeseite nicht mit HTTP 500 abbrechen.
  *
  * @group DB
@@ -72,6 +75,7 @@ class ApplicationTest extends TestCase {
 			}
 		}
 		$this->restoreService('Request');
+		$this->restoreService('UserManager');
 		parent::tearDown();
 	}
 
@@ -144,6 +148,72 @@ class ApplicationTest extends TestCase {
 		$this->assertStringStartsWith('niemand-', $headers[0]['attributes']['login_hint'] ?? '');
 	}
 
+	public function testClientIdWithInvalidUtf8NeverReachesTheDatabase(): void {
+		$mapper = $this->createMock(ClientMapper::class);
+		// PostgreSQL wiese das Byte 0xFF mit SQLSTATE 22021 ab – HTTP 500
+		$mapper->expects($this->never())->method('findByIdentifier');
+		$app = $this->createApp(
+			'/index.php/apps/oauth2/authorize?response_type=code&client_id=%FF&redirect_uri=http%3A%2F%2Flocalhost%3A57197',
+			$mapper
+		);
+
+		$app->boot();
+
+		$this->assertSame([], $this->dataHeaders());
+	}
+
+	public function testUserWithInvalidUtf8NeverReachesTheDatabase(): void {
+		$userManager = $this->createMock(IUserManager::class);
+		// ebenso das Konto: kein Abfragen, kein Anmeldehinweis aus kaputten Bytes
+		$userManager->expects($this->never())->method('get');
+		$this->overwriteService('UserManager', $userManager);
+		$app = $this->createApp(
+			'/index.php/apps/oauth2/authorize?response_type=code&client_id=desktop&user=%FF',
+			$this->createMapperFor('desktop')
+		);
+
+		$app->boot();
+
+		$headers = $this->dataHeaders();
+		$this->assertCount(1, $headers);
+		$this->assertSame(['key' => 'oauth2', 'client' => 'Desktop-Client'], $headers[0]['attributes']);
+	}
+
+	public function testFailingClientLookupIsLoggedInsteadOfAbortingTheLoginPage(): void {
+		// So meldet PostgreSQL ungültige Bytes; jeder andere Datenbankfehler ebenso
+		$failure = new \RuntimeException('SQLSTATE[22021]: Character not in repertoire');
+		$mapper = $this->createMock(ClientMapper::class);
+		$mapper->method('findByIdentifier')->willThrowException($failure);
+		$app = $this->createApp(
+			'/index.php/apps/oauth2/authorize?response_type=code&client_id=desktop',
+			$mapper
+		);
+		$this->expectLoggedFailure($app, $failure);
+
+		$app->boot();
+
+		$this->assertSame([], $this->dataHeaders());
+	}
+
+	public function testFailingUserLookupIsLoggedAndTheGivenUserStaysTheHint(): void {
+		$failure = new \RuntimeException('SQLSTATE[08006]: Connection failure');
+		$userManager = $this->createMock(IUserManager::class);
+		$userManager->method('get')->willThrowException($failure);
+		$this->overwriteService('UserManager', $userManager);
+		$app = $this->createApp(
+			'/index.php/apps/oauth2/authorize?response_type=code&client_id=desktop&user=anna',
+			$this->createMapperFor('desktop')
+		);
+		$this->expectLoggedFailure($app, $failure);
+
+		$app->boot();
+
+		$headers = $this->dataHeaders();
+		$this->assertCount(1, $headers);
+		// wie bei einem unbekannten Konto bleibt der übergebene Name der Hinweis
+		$this->assertSame('anna', $headers[0]['attributes']['login_hint'] ?? null);
+	}
+
 	/**
 	 * Baut die App für eine GET-Anfrage mit der gegebenen redirect_url. Statt
 	 * der echten UserHooks steckt ein Mock im Container: register() hängt
@@ -166,6 +236,19 @@ class ApplicationTest extends TestCase {
 		$userHooks->expects($this->once())->method('register');
 		$container->registerService('UserHooks', static fn () => $userHooks);
 		return $app;
+	}
+
+	/**
+	 * Erwartet genau einen Log-Eintrag der App mit der gescheiterten Abfrage;
+	 * gefangen werden darf sie, verschwiegen nicht.
+	 */
+	private function expectLoggedFailure(Application $app, \Throwable $failure): void {
+		$logger = $this->createMock(ILogger::class);
+		$logger->expects($this->once())->method('logException')->with(
+			$failure,
+			$this->callback(static fn (array $context) => ($context['app'] ?? null) === 'oauth2')
+		);
+		$app->getContainer()->registerService('Logger', static fn () => $logger);
 	}
 
 	private function createMapperFor(string $identifier): ClientMapper {
