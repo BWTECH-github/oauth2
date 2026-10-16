@@ -67,13 +67,26 @@ Sprung nur in der dritten Stelle führt der Kern sie beim Update nicht aus
   anmeldete. Die App übergibt jetzt einen leeren Text, jeder Kern gibt
   `<data …></data>` aus; auf Kernen mit `renderHeaders()` ist die Ausgabe
   unverändert.
-- **Die Anmeldeseite bricht bei verfälschter Rücksprungadresse nicht mehr mit
-  HTTP 500 ab.** Mit `redirect_url[]=…` oder mit `client_id[]=…` bzw.
-  `user[]=…` in der `redirect_url` endete der Aufruf in einem Serverfehler
-  (TypeError in `urldecode()`, InvalidArgumentException aus
-  `ClientMapper::findByIdentifier()`), noch bevor sich jemand anmelden konnte.
-  Solche Werte übergeht die App jetzt; die Anmeldeseite erscheint wie ohne
-  sie.
+- **Verfälschte Werte in der Rücksprungadresse lösen in der App keinen
+  HTTP 500 mehr aus.** `client_id[]=…` in der `redirect_url` ließ
+  `ClientMapper::findByIdentifier()` eine InvalidArgumentException werfen,
+  `redirect_url[]=…` ließ `urldecode()` in der App mit einem TypeError
+  abbrechen – beides endete in der App mit HTTP 500. `user[]=…` führte zu
+  keinem Serverfehler, landete aber als `login_hint="Array"` im Kopfelement.
+  Solche Werte übergeht die App jetzt. Nicht behoben ist damit
+  `/index.php/login?redirect_url[]=x`: Das ergibt weiterhin HTTP 500, die
+  Ursache liegt im `LoginController` des Kerns und wird dort separat
+  behoben.
+- **Ungültiges UTF-8 in der Rücksprungadresse führt nicht mehr zu HTTP 500.**
+  `client_id=%FF` oder `user=%FF` in der `redirect_url` ergeben nach der
+  doppelten Dekodierung ein ungültiges Byte, das bis
+  `ClientMapper::findByIdentifier()` bzw. `IUserManager::get()` durchlief.
+  PostgreSQL lehnt solche Zeichenketten mit SQLSTATE 22021 ab, die Ausnahme
+  blieb ungefangen. Die App prüft beide Werte jetzt auf gültiges UTF-8 und
+  fragt die Datenbank sonst gar nicht erst. Scheitert eine der beiden
+  Abfragen aus anderem Grund, landet der Fehler im Log und die Anmeldeseite
+  erscheint trotzdem – ohne Hinweis auf den Client, beim Konto mit dem
+  übergebenen Namen als Anmeldehinweis.
 
 ## [0.8.0] - 2026-09-29
 

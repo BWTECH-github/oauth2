@@ -24,6 +24,7 @@ use OC;
 use OCA\OAuth2\AuthModule;
 use OCA\OAuth2\Db\AccessTokenMapper;
 use OCA\OAuth2\Db\AuthorizationCodeMapper;
+use OCA\OAuth2\Db\Client;
 use OCA\OAuth2\Db\ClientMapper;
 use OCA\OAuth2\Db\RefreshTokenMapper;
 use OCA\OAuth2\Hooks\UserHooks;
@@ -78,59 +79,111 @@ class Application extends App {
 		if ($request->getMethod() !== 'GET') {
 			return;
 		}
-		$redirectUrl = $request->getParam('redirect_url');
+		$params = self::authorizeParams($request->getParam('redirect_url'));
+		// client_id[]=… ergibt ein Array, findByIdentifier() wirft dafür eine
+		// InvalidArgumentException; solche Eingaben übergehen. Ebenso
+		// ungültiges UTF-8 wie client_id=%FF: PostgreSQL lehnt es mit
+		// SQLSTATE 22021 ab.
+		$clientId = $params['client_id'] ?? null;
+		if (!self::isUtf8String($clientId)) {
+			return;
+		}
+		$client = $this->findClient($clientId);
+		if ($client === null) {
+			return;
+		}
+		Util::addScript('oauth2', 'login');
+		Util::addStyle('oauth2', 'login');
+		$data = ['key' => 'oauth2', 'client' => $client->getName()];
+		// user[]=… ebenso: kein Anmeldehinweis statt eines Arrays im
+		// Kopfelement; ungültiges UTF-8 erreicht die Datenbank nicht.
+		$userId = $params['user'] ?? null;
+		if (self::isUtf8String($userId)) {
+			$data['login_hint'] = $this->findLoginName($userId) ?? $userId;
+		}
+		// Leerer Text statt null: Kerne ohne OC_Template::renderHeaders()
+		// – Core- und SaaS-Tags bis v11.0.22, DEV-Tags bis v11.0.37 und der
+		// Redesign-Kern bis zur Übernahme – geben ein Kopfelement ohne
+		// Text als <data …/> aus. Selbstschließend sind in HTML nur void
+		// elements, <data> bliebe offen und umschlösse die Anmeldekarte,
+		// die dann links oben statt mittig steht. Mit '' wird daraus bei
+		// jedem Kern <data …></data>.
+		Util::addHeader('data', $data, '');
+	}
+
+	/**
+	 * Parameter der Autorisierung, zu der die Anmeldeseite zurückführt;
+	 * leer, wenn redirect_url nicht auf apps/oauth2/authorize zeigt.
+	 */
+	private static function authorizeParams(mixed $redirectUrl): array {
 		// Nur Zeichenketten auswerten: redirect_url[]=… kommt als Array an,
 		// urldecode() bräche mit einem TypeError ab, und statt der
 		// Anmeldeseite käme HTTP 500.
 		if (!\is_string($redirectUrl)) {
-			return;
+			return [];
 		}
-
 		$urlParts = \parse_url(\urldecode($redirectUrl));
-		if (!\is_array($urlParts) || !isset($urlParts['path'])) {
-			return;
-		}
-		if (\strpos($urlParts['path'], 'apps/oauth2/authorize') === false) {
-			return;
-		}
-		if (!isset($urlParts['query'])) {
-			return;
+		if (!\is_array($urlParts) || !isset($urlParts['path'], $urlParts['query'])
+			|| !\str_contains($urlParts['path'], 'apps/oauth2/authorize')) {
+			return [];
 		}
 		$params = [];
 		\parse_str($urlParts['query'], $params);
-		// client_id[]=… ergibt ein Array, findByIdentifier() wirft dafür eine
-		// InvalidArgumentException; solche Eingaben übergehen.
-		if (!isset($params['client_id']) || !\is_string($params['client_id'])) {
-			return;
-		}
+		return $params;
+	}
+
+	/**
+	 * Nur Zeichenketten in gültigem UTF-8 dürfen aus der Adresse an die
+	 * Datenbank gehen.
+	 */
+	private static function isUtf8String(mixed $value): bool {
+		return \is_string($value) && \mb_check_encoding($value, 'UTF-8');
+	}
+
+	/**
+	 * Client zu client_id=…; null, wenn es keinen gibt oder die Abfrage
+	 * scheitert.
+	 */
+	private function findClient(string $clientId): ?Client {
 		/** @var ClientMapper $mapper */
 		$mapper = OC::$server->query(ClientMapper::class);
 		try {
-			/** @var \OCA\OAuth2\Db\Client $client */
-			$client = $mapper->findByIdentifier($params['client_id']);
-			Util::addScript('oauth2', 'login');
-			Util::addStyle('oauth2', 'login');
-			$data = ['key' => 'oauth2', 'client' => $client->getName()];
-			// user[]=… ebenso: kein Anmeldehinweis statt eines Arrays im Kopfelement
-			if (isset($params['user']) && \is_string($params['user'])) {
-				$u = OC::$server->getUserManager()->get($params['user']);
-				if ($u !== null) {
-					$data['login_hint'] = $u->getUserName();
-				}
-				if (!isset($data['login_hint']) || !\is_string($data['login_hint']) || $data['login_hint'] === '') {
-					$data['login_hint'] = $params['user'];
-				}
-			}
-			// Leerer Text statt null: Kerne ohne OC_Template::renderHeaders()
-			// – Core- und SaaS-Tags bis v11.0.22, DEV-Tags bis v11.0.37 und der
-			// Redesign-Kern bis zur Übernahme – geben ein Kopfelement ohne
-			// Text als <data …/> aus. Selbstschließend sind in HTML nur void
-			// elements, <data> bliebe offen und umschlösse die Anmeldekarte,
-			// die dann links oben statt mittig steht. Mit '' wird daraus bei
-			// jedem Kern <data …></data>.
-			Util::addHeader('data', $data, '');
+			/** @var Client $client */
+			$client = $mapper->findByIdentifier($clientId);
 		} catch (DoesNotExistException) {
 			// ignore - the given client id is not known
+			return null;
+		} catch (\Throwable $e) {
+			// Ein Fehler der Abfrage darf die Anmeldeseite nicht mit HTTP 500
+			// abbrechen; sie erscheint dann ohne Hinweis auf den Client.
+			$this->logLookupFailure($e, 'client');
+			return null;
 		}
+		return $client;
+	}
+
+	/**
+	 * Anmeldename des Kontos aus user=…; null, wenn es keins gibt oder die
+	 * Abfrage scheitert – dann bleibt der übergebene Wert der Hinweis.
+	 */
+	private function findLoginName(string $userId): ?string {
+		try {
+			$user = OC::$server->getUserManager()->get($userId);
+		} catch (\Throwable $e) {
+			$this->logLookupFailure($e, 'user');
+			return null;
+		}
+		$name = $user?->getUserName();
+		return \is_string($name) && $name !== '' ? $name : null;
+	}
+
+	/**
+	 * Gefangen, aber nicht verschwiegen: Der Fehler landet im Log.
+	 */
+	private function logLookupFailure(\Throwable $e, string $subject): void {
+		$this->getContainer()->query('Logger')->logException($e, [
+			'app' => 'oauth2',
+			'message' => "Looking up the $subject from the redirect_url of the login page failed",
+		]);
 	}
 }
