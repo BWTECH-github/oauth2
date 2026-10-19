@@ -49,10 +49,10 @@ class AccessToken extends Entity {
 	}
 
 	/**
-	 * Resets the expiry time to EXPIRATION_TIME seconds from now.
+	 * Resets the expiry time to $lifetime (default EXPIRATION_TIME) seconds from now.
 	 */
-	public function resetExpires(): void {
-		$this->setExpires(\time() + self::EXPIRATION_TIME);
+	public function resetExpires(int $lifetime = self::EXPIRATION_TIME): void {
+		$this->setExpires(\time() + $lifetime);
 	}
 
 	/**

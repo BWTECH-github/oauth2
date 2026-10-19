@@ -295,4 +295,42 @@ class RefreshTokenMapperTest extends TestCase {
 		$this->refreshTokenMapper->deleteAll();
 		$this->assertEquals(0, \count($this->refreshTokenMapper->findAll()));
 	}
+
+	/**
+	 * Den Austausch vermerkt nur der erste Aufruf; ein zweiter für dasselbe Refresh-Token ändert nichts.
+	 */
+	public function testMarkRotatedOnlyOnce(): void {
+		$this->assertSame(1, $this->refreshTokenMapper->markRotated($this->id, $this->refreshToken2->getId(), 1000));
+		$this->assertSame(0, $this->refreshTokenMapper->markRotated($this->id, 4711, 2000));
+
+		/** @var RefreshToken $rotated */
+		$rotated = $this->refreshTokenMapper->find($this->id);
+		$this->assertSame(1000, $rotated->getRotatedAt());
+		$this->assertSame($this->refreshToken2->getId(), $rotated->getSuccessorId());
+		/** @var RefreshToken $other */
+		$other = $this->refreshTokenMapper->find($this->refreshToken2->getId());
+		$this->assertNull($other->getRotatedAt());
+		$this->assertNull($other->getSuccessorId());
+	}
+
+	public function testDeleteBySuccessor(): void {
+		$this->refreshTokenMapper->markRotated($this->id, $this->refreshToken2->getId(), \time());
+
+		$this->refreshTokenMapper->deleteBySuccessor($this->refreshToken2->getId());
+
+		$tokens = \array_map(static fn (RefreshToken $t) => $t->getToken(), $this->refreshTokenMapper->findAll());
+		$this->assertSame([$this->refreshToken2->getToken()], $tokens);
+	}
+
+	public function testCleanUpDeletesOnlyLongExchangedTokens(): void {
+		$this->refreshTokenMapper->markRotated($this->id, $this->refreshToken2->getId(), 1000);
+
+		$this->refreshTokenMapper->cleanUp(999);
+		$this->assertCount(2, $this->refreshTokenMapper->findAll());
+
+		$this->refreshTokenMapper->cleanUp(1001);
+		$tokens = \array_map(static fn (RefreshToken $t) => $t->getToken(), $this->refreshTokenMapper->findAll());
+		// unverbrauchte Refresh-Tokens bleiben, wie alt sie auch sind
+		$this->assertSame([$this->refreshToken2->getToken()], $tokens);
+	}
 }

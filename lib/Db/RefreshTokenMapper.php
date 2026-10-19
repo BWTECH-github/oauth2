@@ -27,7 +27,8 @@ use OCP\IDb;
 
 class RefreshTokenMapper extends Mapper {
 	public function __construct(IDb $db) {
-		parent::__construct($db, 'oauth2_refresh_tokens');
+		// die Entity ausdrücklich: aus dem Klassennamen abgeleitet ginge es für Unterklassen schief
+		parent::__construct($db, 'oauth2_refresh_tokens', RefreshToken::class);
 	}
 
 	/**
@@ -112,5 +113,35 @@ class RefreshTokenMapper extends Mapper {
 	public function deleteAll(): void {
 		$sql = 'DELETE FROM `' . $this->tableName . '`';
 		$this->executeStatement($sql, []);
+	}
+
+	/**
+	 * Vermerkt den Austausch eines Refresh-Tokens, aber nur, wenn es noch
+	 * keiner verbraucht hat. Zwei gleichzeitige Anfragen mit demselben Token
+	 * kommen so nicht beide durch: Die Datenbank sperrt die Zeile, die zweite
+	 * findet sie danach schon verbraucht und ändert nichts.
+	 *
+	 * @return int 1, wenn dieser Aufruf den Austausch vermerkt hat, sonst 0
+	 */
+	public function markRotated(int $id, int $successorId, int $rotatedAt): int {
+		$sql = 'UPDATE `' . $this->tableName . '` SET `rotated_at` = ?, `successor_id` = ? WHERE `id` = ? AND `rotated_at` IS NULL';
+		return $this->executeStatement($sql, [$rotatedAt, $successorId, $id]);
+	}
+
+	/**
+	 * Löscht die verbrauchten Vorgänger eines Refresh-Tokens: Wird es selbst
+	 * ausgetauscht, braucht deren Gnadenfrist niemand mehr.
+	 */
+	public function deleteBySuccessor(int $successorId): void {
+		$sql = 'DELETE FROM `' . $this->tableName . '` WHERE `successor_id` = ?';
+		$this->executeStatement($sql, [$successorId]);
+	}
+
+	/**
+	 * Löscht Refresh-Tokens, die vor $rotatedBefore ausgetauscht wurden.
+	 */
+	public function cleanUp(int $rotatedBefore): void {
+		$sql = 'DELETE FROM `' . $this->tableName . '` WHERE `rotated_at` IS NOT NULL AND `rotated_at` < ?';
+		$this->executeStatement($sql, [$rotatedBefore]);
 	}
 }

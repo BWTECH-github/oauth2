@@ -130,4 +130,13 @@ class AccessTokenMapper extends Mapper {
 		$sql = 'DELETE FROM `' . $this->tableName . '` WHERE `expires` <= ' . (\time() - 60 * 60 * 24 * 7);
 		$this->executeStatement($sql);
 	}
+
+	/**
+	 * Lässt ein Access-Token spätestens zum Zeitpunkt $expires ablaufen; ein
+	 * früherer Ablauf bleibt.
+	 */
+	public function limitExpiry(int $id, int $expires): void {
+		$sql = 'UPDATE `' . $this->tableName . '` SET `expires` = ? WHERE `id` = ? AND `expires` > ?';
+		$this->executeStatement($sql, [$expires, $id, $expires]);
+	}
 }

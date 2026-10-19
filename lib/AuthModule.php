@@ -87,16 +87,17 @@ class AuthModule implements IAuthModule {
 			$accessToken = $accessTokenMapper->findByToken($bearerToken);
 
 			if ($accessToken->hasExpired()) {
-				$logger->debug("token expired $bearerToken", ['app' => __CLASS__]);
+				// das Token selbst nie ins Log: bei loglevel 0 stand es dort sonst im Klartext
+				$logger->debug('access token expired', ['app' => __CLASS__]);
 				return null;
 			}
 		} catch (DoesNotExistException) {
 			// we don't know the token - openid connect can handle it
 			$this->tokenUnknown = true;
-			$logger->debug("token does not exist $bearerToken", ['app' => __CLASS__]);
+			$logger->debug('access token does not exist', ['app' => __CLASS__]);
 			return null;
 		} catch (MultipleObjectsReturnedException) {
-			$logger->debug("multiple tokens exist for $bearerToken", ['app' => __CLASS__]);
+			$logger->debug('multiple access tokens exist for the presented token', ['app' => __CLASS__]);
 			return null;
 		}
 

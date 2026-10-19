@@ -48,6 +48,15 @@ OAuth2 has no app-specific `config.php` keys — clients are managed entirely th
 'overwrite.cli.url'   => 'https://cloud.example.com',  // canonical URL used in message_url
 ```
 
+Two app settings tune the token lifetimes (both optional):
+
+```bash
+# lifetime of new access tokens in seconds (10–86400, default 3600)
+sudo -u www-data php occ config:app:set oauth2 access_token_lifetime --value 3600
+# how long an exchanged refresh token still yields the same new tokens (0–3600, default 180, 0 = off)
+sudo -u www-data php occ config:app:set oauth2 refresh_token_grace_period --value 180
+```
+
 Endpoints (relative to the owncloud.online base URL):
 
 | Purpose             | URL                                  | Method    |
@@ -164,7 +173,9 @@ POST /index.php/apps/oauth2/api/v1/token
 grant_type=refresh_token&refresh_token=<refresh_token>
 ```
 
-Access tokens expire after one hour (`AccessToken::EXPIRATION_TIME = 3600`); authorization codes after 10 minutes (`AuthorizationCode::EXPIRATION_TIME = 600`).
+Access tokens expire after one hour (`AccessToken::EXPIRATION_TIME = 3600`, see `access_token_lifetime` above); authorization codes after 10 minutes (`AuthorizationCode::EXPIRATION_TIME = 600`).
+
+Every refresh replaces the refresh token (rotation). The exchange runs in one database transaction, so two simultaneous refreshes with the same refresh token yield one new pair, not two. If the client did not receive the answer (timeout, proxy, dropped connection, sleep) and repeats the refresh within the grace period (`refresh_token_grace_period`, default 180 s), it gets the same new pair again instead of `invalid_grant`; the previous access token stays valid for the same time. Afterwards, or once the new refresh token has been used itself, the old one answers `invalid_grant`.
 
 ## Troubleshooting
 

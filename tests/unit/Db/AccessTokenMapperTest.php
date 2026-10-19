@@ -278,4 +278,20 @@ class AccessTokenMapperTest extends TestCase {
 		$this->assertEquals(1, \count($this->accessTokenMapper->findAll()));
 		$this->assertEquals($this->accessToken2->getToken(), $this->accessTokenMapper->findAll()[0]->getToken());
 	}
+
+	/**
+	 * Ein späterer Ablauf wird vorgezogen, ein früherer bleibt.
+	 */
+	public function testLimitExpiry(): void {
+		$limit = \time() + 100;
+		$this->accessTokenMapper->limitExpiry($this->accessToken2->getId(), $limit);
+		/** @var AccessToken $limited */
+		$limited = $this->accessTokenMapper->find($this->accessToken2->getId());
+		$this->assertSame($limit, $limited->getExpires());
+
+		$this->accessTokenMapper->limitExpiry($this->accessToken2->getId(), $limit + 1000);
+		/** @var AccessToken $unchanged */
+		$unchanged = $this->accessTokenMapper->find($this->accessToken2->getId());
+		$this->assertSame($limit, $unchanged->getExpires());
+	}
 }
