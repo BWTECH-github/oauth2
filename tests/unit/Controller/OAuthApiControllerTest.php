@@ -158,16 +158,27 @@ class OAuthApiControllerTest extends TestCase {
 		$this->request = $this->createMock(IRequest::class);
 		$this->userManager = $this->createMock(IUserManager::class);
 
-		$this->controller = new OAuthApiController(
+		$this->controller = $this->createController($this->refreshTokenMapper);
+	}
+
+	/**
+	 * Controller mit den Mappern des Tests; ein eigener RefreshTokenMapper
+	 * spielt gleichzeitige Anfragen nach.
+	 */
+	private function createController(RefreshTokenMapper $refreshTokenMapper): OAuthApiController {
+		$container = (new Application())->getContainer();
+		return new OAuthApiController(
 			$container->query('AppName'),
 			$this->request,
 			$this->clientMapper,
 			$this->authorizationCodeMapper,
 			$this->accessTokenMapper,
-			$this->refreshTokenMapper,
+			$refreshTokenMapper,
 			$this->userManager,
-			$urlGenerator,
-			$container->query('Logger')
+			$container->query('ServerContainer')->getURLGenerator(),
+			$container->query('Logger'),
+			\OC::$server->getDatabaseConnection(),
+			\OC::$server->getConfig()
 		);
 	}
 
@@ -183,6 +194,37 @@ class OAuthApiControllerTest extends TestCase {
 			$this->clientMapper->delete($this->desktopClient);
 			$this->desktopClient = null;
 		}
+		$config = \OC::$server->getConfig();
+		$config->deleteAppValue('oauth2', 'access_token_lifetime');
+		$config->deleteAppValue('oauth2', 'refresh_token_grace_period');
+		$_SERVER['PHP_AUTH_USER'] = null;
+		$_SERVER['PHP_AUTH_PW'] = null;
+	}
+
+	/**
+	 * Ein gültiger Austausch: Client-Kennung und Geheimnis von client1, Konto aktiv.
+	 */
+	private function prepareRefresh(): void {
+		$_SERVER['PHP_AUTH_USER'] = $this->clientIdentifier1;
+		$_SERVER['PHP_AUTH_PW'] = $this->clientSecret;
+		$userMock = $this->createMock(IUser::class);
+		$userMock->method('isEnabled')->willReturn(true);
+		$this->userManager->method('get')->willReturn($userMock);
+	}
+
+	private function refresh(string $refreshToken, ?OAuthApiController $controller = null): \stdClass {
+		$result = ($controller ?? $this->controller)->generateToken('refresh_token', null, null, $refreshToken);
+		$this->assertInstanceOf(JSONResponse::class, $result);
+		$json = \json_decode($result->render());
+		$json->status = $result->getStatus();
+		return $json;
+	}
+
+	private function setRotatedAt(string $refreshToken, int $rotatedAt): void {
+		\OC::$server->getDatabaseConnection()->executeUpdate(
+			'UPDATE `*PREFIX*oauth2_refresh_tokens` SET `rotated_at` = ? WHERE `token` = ?',
+			[$rotatedAt, $refreshToken]
+		);
 	}
 
 	public function testGenerateTokenWithUnknownGrantType() {
@@ -383,8 +425,165 @@ class OAuthApiControllerTest extends TestCase {
 		$this->assertNotEmpty($json->message_url);
 		$this->assertEquals($this->authorizationSuccessfulMessageUrl, $json->message_url);
 		$this->assertEquals(200, $result->getStatus());
-		$this->assertEquals(1, \count($this->accessTokenMapper->findAll()));
-		$this->assertEquals(1, \count($this->refreshTokenMapper->findAll()));
+		// das alte Paar bleibt für die Gnadenfrist stehen: das Refresh-Token als verbraucht, das Access-Token mit kurzem Ablauf
+		$this->assertEquals(2, \count($this->accessTokenMapper->findAll()));
+		$this->assertEquals(2, \count($this->refreshTokenMapper->findAll()));
+		/** @var RefreshToken $old */
+		$old = $this->refreshTokenMapper->find($this->refreshToken->getId());
+		$this->assertNotNull($old->getRotatedAt());
+		/** @var RefreshToken $successor */
+		$successor = $this->refreshTokenMapper->findByToken($json->refresh_token);
+		$this->assertSame($successor->getId(), $old->getSuccessorId());
+		$this->assertNull($successor->getRotatedAt());
+		/** @var AccessToken $oldAccessToken */
+		$oldAccessToken = $this->accessTokenMapper->find($this->accessToken->getId());
+		$this->assertLessThanOrEqual(\time() + OAuthApiController::REFRESH_TOKEN_GRACE_PERIOD, $oldAccessToken->getExpires());
+		$this->assertFalse($oldAccessToken->hasExpired());
+	}
+
+	/**
+	 * Die Antwort auf einen Austausch ging verloren, der Client wiederholt ihn mit dem alten Refresh-Token: Innerhalb der
+	 * Gnadenfrist bekommt er dasselbe Paar, nicht invalid_grant. Bisher musste er sich neu anmelden.
+	 */
+	public function testRefreshRepeatedWithinTheGracePeriodGetsTheSameTokens(): void {
+		$this->prepareRefresh();
+		$first = $this->refresh($this->refreshToken->getToken());
+		$this->assertSame(200, $first->status);
+
+		$second = $this->refresh($this->refreshToken->getToken());
+
+		$this->assertSame(200, $second->status);
+		$this->assertSame($first->access_token, $second->access_token);
+		$this->assertSame($first->refresh_token, $second->refresh_token);
+		$this->assertSame('Bearer', $second->token_type);
+		$this->assertGreaterThan(AccessToken::EXPIRATION_TIME - 10, $second->expires_in);
+		$this->assertLessThanOrEqual(AccessToken::EXPIRATION_TIME, $second->expires_in);
+		// kein drittes Paar
+		$this->assertCount(2, $this->accessTokenMapper->findAll());
+		$this->assertCount(2, $this->refreshTokenMapper->findAll());
+
+		// das neue Refresh-Token tauscht ganz normal weiter
+		$third = $this->refresh($first->refresh_token);
+		$this->assertSame(200, $third->status);
+		$this->assertNotSame($first->refresh_token, $third->refresh_token);
+	}
+
+	public function testRefreshRepeatedAfterTheGracePeriodIsRejected(): void {
+		$this->prepareRefresh();
+		$first = $this->refresh($this->refreshToken->getToken());
+		$this->assertSame(200, $first->status);
+		$this->setRotatedAt($this->refreshToken->getToken(), \time() - OAuthApiController::REFRESH_TOKEN_GRACE_PERIOD - 1);
+
+		$second = $this->refresh($this->refreshToken->getToken());
+
+		$this->assertSame(400, $second->status);
+		$this->assertSame('invalid_grant', $second->error);
+		// das neue Paar gilt weiter
+		$this->assertSame(200, $this->refresh($first->refresh_token)->status);
+	}
+
+	/**
+	 * Hat der Client das neue Refresh-Token schon benutzt, hat er die Antwort erhalten: das alte bleibt abgelehnt, und es
+	 * verschwindet beim nächsten Austausch.
+	 */
+	public function testRefreshRepeatedAfterTheSuccessorWasUsedIsRejected(): void {
+		$this->prepareRefresh();
+		$first = $this->refresh($this->refreshToken->getToken());
+		$second = $this->refresh($first->refresh_token);
+		$this->assertSame(200, $second->status);
+
+		$replay = $this->refresh($this->refreshToken->getToken());
+
+		$this->assertSame(400, $replay->status);
+		$this->assertSame('invalid_grant', $replay->error);
+		// das zweite Refresh-Token liefert innerhalb der Frist weiter das Paar seines Austauschs, denn dessen Nachfolger ist
+		// noch unbenutzt
+		$this->assertSame($second->refresh_token, $this->refresh($first->refresh_token)->refresh_token);
+		// beim zweiten Austausch fiel das erste Refresh-Token weg
+		$tokens = \array_map(static fn (RefreshToken $t) => $t->getToken(), $this->refreshTokenMapper->findAll());
+		$this->assertNotContains($this->refreshToken->getToken(), $tokens);
+		$this->assertContains($first->refresh_token, $tokens);
+		$this->assertContains($second->refresh_token, $tokens);
+	}
+
+	public function testGracePeriodCanBeTurnedOff(): void {
+		\OC::$server->getConfig()->setAppValue('oauth2', 'refresh_token_grace_period', '0');
+		$this->prepareRefresh();
+		$first = $this->refresh($this->refreshToken->getToken());
+		$this->assertSame(200, $first->status);
+
+		$replay = $this->refresh($this->refreshToken->getToken());
+
+		$this->assertSame(400, $replay->status);
+		$this->assertSame('invalid_grant', $replay->error);
+		/** @var AccessToken $oldAccessToken */
+		$oldAccessToken = $this->accessTokenMapper->find($this->accessToken->getId());
+		$this->assertTrue($oldAccessToken->hasExpired());
+	}
+
+	/**
+	 * Zwei gleichzeitige Austauschanfragen mit demselben Refresh-Token: Die zweite las das Token, bevor die erste es als
+	 * verbraucht vermerkte. Sie tauscht nicht noch einmal aus, sondern bekommt das Paar der ersten; kein zweiter
+	 * Nachfolger, kein invalid_grant. Bisher ergaben solche Anfragen mehrere gültige Paare und/oder invalid_grant.
+	 */
+	public function testConcurrentRefreshesYieldOnePair(): void {
+		$this->prepareRefresh();
+		$db = (new Application())->getContainer()->query(\OCP\IDb::class);
+		$racingMapper = new class($db) extends RefreshTokenMapper {
+			public ?\Closure $afterLookup = null;
+
+			public function findByToken($token): \OCP\AppFramework\Db\Entity {
+				$entity = parent::findByToken($token);
+				if ($this->afterLookup !== null) {
+					$afterLookup = $this->afterLookup;
+					$this->afterLookup = null;
+					$afterLookup();
+				}
+				return $entity;
+			}
+		};
+		$winner = null;
+		$racingMapper->afterLookup = function () use (&$winner) {
+			// die andere Anfrage tauscht aus, während diese das Token schon gelesen hat
+			$winner = $this->refresh($this->refreshToken->getToken());
+		};
+
+		$loser = $this->refresh($this->refreshToken->getToken(), $this->createController($racingMapper));
+
+		$this->assertNotNull($winner);
+		$this->assertSame(200, $winner->status);
+		$this->assertSame(200, $loser->status);
+		$this->assertSame($winner->access_token, $loser->access_token);
+		$this->assertSame($winner->refresh_token, $loser->refresh_token);
+		// genau ein Nachfolger, die zurückgerollte Anfrage hinterlässt nichts
+		$this->assertCount(2, $this->accessTokenMapper->findAll());
+		$this->assertCount(2, $this->refreshTokenMapper->findAll());
+	}
+
+	public function testAccessTokenLifetimeIsConfigurable(): void {
+		$config = \OC::$server->getConfig();
+		$config->setAppValue('oauth2', 'access_token_lifetime', '30');
+		$this->prepareRefresh();
+
+		$json = $this->refresh($this->refreshToken->getToken());
+
+		$this->assertSame(200, $json->status);
+		$this->assertSame(30, $json->expires_in);
+		/** @var AccessToken $accessToken */
+		$accessToken = $this->accessTokenMapper->findByToken($json->access_token);
+		$this->assertLessThanOrEqual(\time() + 30, $accessToken->getExpires());
+		$this->assertGreaterThanOrEqual(\time() + 29, $accessToken->getExpires());
+
+		// Grenzen: mindestens 10 s, höchstens ein Tag; Unsinn ergibt den Standard
+		$config->setAppValue('oauth2', 'access_token_lifetime', '1');
+		$json = $this->refresh($json->refresh_token);
+		$this->assertSame(10, $json->expires_in);
+		$config->setAppValue('oauth2', 'access_token_lifetime', '9999999');
+		$json = $this->refresh($json->refresh_token);
+		$this->assertSame(86400, $json->expires_in);
+		$config->setAppValue('oauth2', 'access_token_lifetime', 'eine Stunde');
+		$json = $this->refresh($json->refresh_token);
+		$this->assertSame(AccessToken::EXPIRATION_TIME, $json->expires_in);
 	}
 
 	public function testGenerateTokenWithRefreshTokenClient242() {
@@ -469,8 +668,9 @@ class OAuthApiControllerTest extends TestCase {
 		$this->assertNotEmpty($json->message_url);
 		$this->assertEquals($this->authorizationSuccessfulMessageUrl, $json->message_url);
 		$this->assertEquals(200, $result->getStatus());
-		$this->assertEquals(1, \count($this->accessTokenMapper->findAll()));
-		$this->assertEquals(1, \count($this->refreshTokenMapper->findAll()));
+		// das alte Paar bleibt für die Gnadenfrist stehen
+		$this->assertEquals(2, \count($this->accessTokenMapper->findAll()));
+		$this->assertEquals(2, \count($this->refreshTokenMapper->findAll()));
 	}
 
 	public function testGenerateTokenWithAuthorizationCodeDisabledUser() {

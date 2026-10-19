@@ -24,6 +24,7 @@ use OC;
 use OCA\OAuth2\Db\AccessToken;
 use OCA\OAuth2\Db\AccessTokenMapper;
 use OCA\OAuth2\Db\AuthorizationCodeMapper;
+use OCA\OAuth2\Db\Client;
 use OCA\OAuth2\Db\ClientMapper;
 use OCA\OAuth2\Db\RefreshToken;
 use OCA\OAuth2\Db\RefreshTokenMapper;
@@ -33,12 +34,26 @@ use OCP\AppFramework\ApiController;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\JSONResponse;
+use OCP\IConfig;
+use OCP\IDBConnection;
 use OCP\ILogger;
 use OCP\IRequest;
 use OCP\IURLGenerator;
 use OCP\IUserManager;
 
 class OAuthApiController extends ApiController {
+	/**
+	 * So lange (Sekunden) nimmt der Token-Endpunkt ein schon ausgetauschtes
+	 * Refresh-Token noch an und liefert dann dasselbe neue Paar, und so lange
+	 * gilt das Access-Token des Vorgängers weiter. Geht die Antwort auf einen
+	 * Austausch verloren (Zeitüberschreitung, Proxy, Verbindungsabbruch,
+	 * Ruhezustand), kommt der Client mit seiner Wiederholung so noch an die
+	 * neuen Tokens statt an invalid_grant und eine neue Anmeldung.
+	 * Einstellbar mit `occ config:app:set oauth2 refresh_token_grace_period
+	 * --value <Sekunden>` (0 bis 3600, 0 schaltet sie ab).
+	 */
+	public const REFRESH_TOKEN_GRACE_PERIOD = 180;
+
 	public function __construct(
 		$AppName,
 		IRequest $request,
@@ -48,7 +63,9 @@ class OAuthApiController extends ApiController {
 		private readonly RefreshTokenMapper $refreshTokenMapper,
 		private readonly IUserManager $userManager,
 		private readonly IURLGenerator $urlGenerator,
-		private readonly ILogger $logger
+		private readonly ILogger $logger,
+		private readonly IDBConnection $db,
+		private readonly IConfig $config
 	) {
 		parent::__construct($AppName, $request);
 	}
@@ -217,8 +234,6 @@ class OAuthApiController extends ApiController {
 					return new JSONResponse(['error' => 'invalid_grant', 'error_description' => 'refresh grant client ids mismatch'], $statusCode);
 				}
 
-				$this->logger->info('A refresh token has been used by the client "' . $client->getName() . '" to request an access token.', ['app' => $this->appName]);
-
 				$userId = $refreshToken->getUserId();
 
 				// strip off username if it exists
@@ -232,43 +247,170 @@ class OAuthApiController extends ApiController {
 					return new JSONResponse(['error' => 'unauthorized_client', 'error_description' => 'user not enabled'], Http::STATUS_BAD_REQUEST);
 				}
 
-				$relatedAccessToken = new AccessToken();
-				$relatedAccessToken->setId($refreshToken->getAccessTokenId());
-				$this->accessTokenMapper->delete($relatedAccessToken);
-				$this->refreshTokenMapper->delete($refreshToken);
-
-				break;
+				return $this->refreshTokens($refreshToken, $client, $userId, $statusCode);
 			default:
 				OC::$server->getLogger()->debug("unhandled grant type: {$grant_type}", ['app' => __CLASS__]);
 				return new JSONResponse(['error' => 'invalid_grant', 'error_description' => 'unhandled grant type'], Http::STATUS_BAD_REQUEST);
 		}
 
-		$token = Utilities::generateRandom();
+		[$accessToken, $refreshToken] = $this->issueTokens($client, $userId);
+		return $this->tokenResponse($accessToken, $refreshToken, $userId);
+	}
+
+	/**
+	 * Tauscht ein Refresh-Token gegen ein neues Paar aus Access- und
+	 * Refresh-Token (Rotation).
+	 *
+	 * Neues Paar anlegen und das alte als verbraucht vermerken geschieht in
+	 * einer Transaktion, das Vermerken nur, wenn das alte noch unverbraucht
+	 * ist: Von zwei gleichzeitigen Anfragen mit demselben Refresh-Token tauscht
+	 * genau eine aus, die andere bekommt deren Ergebnis (replayRotation()).
+	 * Bisher löschte der Austausch altes Refresh- und Access-Token sofort und
+	 * legte das neue Paar danach ohne Transaktion an: Gleichzeitige Anfragen
+	 * ergaben mehrere gültige Nachfolger oder invalid_grant, und ging die
+	 * Antwort verloren, scheiterte die Wiederholung des Clients mit
+	 * invalid_grant und er musste sich neu anmelden.
+	 */
+	private function refreshTokens(RefreshToken $refreshToken, Client $client, string $userId, int $statusCode): JSONResponse {
+		$now = \time();
+		$gracePeriod = $this->refreshTokenGracePeriod();
+
+		if ($refreshToken->getRotatedAt() !== null) {
+			return $this->replayRotation($refreshToken, $client, $now, $gracePeriod, $statusCode);
+		}
+
+		$this->db->beginTransaction();
+		try {
+			[$accessToken, $newRefreshToken] = $this->issueTokens($client, $userId);
+			$rotated = $this->refreshTokenMapper->markRotated($refreshToken->getId(), $newRefreshToken->getId(), $now) === 1;
+			if ($rotated) {
+				// Anfragen mit dem bisherigen Access-Token, die noch unterwegs sind, gehen während der Gnadenfrist durch
+				$this->accessTokenMapper->limitExpiry($refreshToken->getAccessTokenId(), $now + $gracePeriod);
+				$this->db->commit();
+			} else {
+				$this->db->rollBack();
+			}
+		} catch (\Throwable $e) {
+			if ($this->db->inTransaction()) {
+				$this->db->rollBack();
+			}
+			throw $e;
+		}
+
+		if ($rotated) {
+			// Aufräumen außerhalb der Transaktion: die verbrauchten Vorgänger braucht ab jetzt niemand mehr
+			try {
+				$this->refreshTokenMapper->deleteBySuccessor($refreshToken->getId());
+			} catch (\Throwable $e) {
+				$this->logger->logException($e, ['app' => $this->appName, 'message' => 'Could not delete exchanged refresh tokens']);
+			}
+		} else {
+			// eine gleichzeitige Anfrage mit demselben Refresh-Token war schneller: ihr Ergebnis gilt auch für diese
+			try {
+				/** @var RefreshToken $current */
+				$current = $this->refreshTokenMapper->find($refreshToken->getId());
+			} catch (DoesNotExistException) {
+				return $this->refreshTokenUsed($statusCode);
+			}
+			return $this->replayRotation($current, $client, $now, $gracePeriod, $statusCode);
+		}
+
+		$this->logger->info('A refresh token has been used by the client "' . $client->getName() . '" to request an access token.', ['app' => $this->appName]);
+		return $this->tokenResponse($accessToken, $newRefreshToken, $userId);
+	}
+
+	/**
+	 * Ein schon ausgetauschtes Refresh-Token kommt noch einmal: Liegt der
+	 * Austausch weniger als die Gnadenfrist zurück und ist sein Nachfolger noch
+	 * unverbraucht, bekommt der Client dasselbe Paar wie beim Austausch – er
+	 * hat die Antwort darauf wohl nicht erhalten. Sonst invalid_grant.
+	 */
+	private function replayRotation(RefreshToken $rotated, Client $client, int $now, int $gracePeriod, int $statusCode): JSONResponse {
+		$successorId = $rotated->getSuccessorId();
+		if ($successorId === null || $now - (int)$rotated->getRotatedAt() >= $gracePeriod) {
+			$this->logger->info('The client "' . $client->getName() . '" used a refresh token that had already been exchanged.', ['app' => $this->appName]);
+			return $this->refreshTokenUsed($statusCode);
+		}
+		try {
+			/** @var RefreshToken $successor */
+			$successor = $this->refreshTokenMapper->find($successorId);
+			/** @var AccessToken $accessToken */
+			$accessToken = $this->accessTokenMapper->find($successor->getAccessTokenId());
+		} catch (DoesNotExistException) {
+			return $this->refreshTokenUsed($statusCode);
+		}
+		if ($successor->getRotatedAt() !== null || $successor->getClientId() !== $rotated->getClientId() || $successor->getUserId() !== $rotated->getUserId()) {
+			// der Nachfolger ist selbst schon ausgetauscht: der Client hat die Antwort also erhalten
+			$this->logger->info('The client "' . $client->getName() . '" used a refresh token that had already been exchanged.', ['app' => $this->appName]);
+			return $this->refreshTokenUsed($statusCode);
+		}
+
+		$userId = $successor->getUserId();
+		if (\strstr($userId, ':')) {
+			[, $userId] = \explode(':', $userId, 2);
+		}
+		$this->logger->info('The client "' . $client->getName() . '" repeated a token refresh within the grace period and got the same tokens again.', ['app' => $this->appName]);
+		return $this->tokenResponse($accessToken, $successor, $userId, \max(0, $accessToken->getExpires() - $now));
+	}
+
+	private function refreshTokenUsed(int $statusCode): JSONResponse {
+		return new JSONResponse(['error' => 'invalid_grant', 'error_description' => 'refresh token does not exist'], $statusCode);
+	}
+
+	/**
+	 * Legt ein neues Paar aus Access- und Refresh-Token an.
+	 *
+	 * @return array{0: AccessToken, 1: RefreshToken}
+	 */
+	private function issueTokens(Client $client, string $userId): array {
 		$accessToken = new AccessToken();
-		$accessToken->setToken($token);
+		$accessToken->setToken(Utilities::generateRandom());
 		$accessToken->setClientId($client->getId());
 		$accessToken->setUserId($userId);
-		$accessToken->resetExpires();
+		$accessToken->resetExpires($this->accessTokenLifetime());
 		$this->accessTokenMapper->insert($accessToken);
 
-		$token = Utilities::generateRandom();
 		$refreshToken = new RefreshToken();
-		$refreshToken->setToken($token);
+		$refreshToken->setToken(Utilities::generateRandom());
 		$refreshToken->setClientId($client->getId());
 		$refreshToken->setUserId($userId);
 		$refreshToken->setAccessTokenId($accessToken->getId());
 		$this->refreshTokenMapper->insert($refreshToken);
 
+		return [$accessToken, $refreshToken];
+	}
+
+	private function tokenResponse(AccessToken $accessToken, RefreshToken $refreshToken, string $userId, ?int $expiresIn = null): JSONResponse {
 		return new JSONResponse(
 			[
 				'access_token' => $accessToken->getToken(),
 				'token_type' => 'Bearer',
-				'expires_in' => AccessToken::EXPIRATION_TIME,
+				'expires_in' => $expiresIn ?? $this->accessTokenLifetime(),
 				'refresh_token' => $refreshToken->getToken(),
 				'user_id' => $userId,
 				'message_url' => $this->urlGenerator->linkToRouteAbsolute($this->appName . '.page.authorizationSuccessful')
 			]
 		);
+	}
+
+	/**
+	 * Lebensdauer neuer Access-Tokens in Sekunden: `occ config:app:set oauth2
+	 * access_token_lifetime --value <Sekunden>` (10 bis 86400, Standard 3600).
+	 */
+	private function accessTokenLifetime(): int {
+		$value = $this->config->getAppValue($this->appName, 'access_token_lifetime', '');
+		if (!\is_numeric($value)) {
+			return AccessToken::EXPIRATION_TIME;
+		}
+		return \min(86400, \max(10, (int)$value));
+	}
+
+	private function refreshTokenGracePeriod(): int {
+		$value = $this->config->getAppValue($this->appName, 'refresh_token_grace_period', '');
+		if (!\is_numeric($value)) {
+			return self::REFRESH_TOKEN_GRACE_PERIOD;
+		}
+		return \min(3600, \max(0, (int)$value));
 	}
 
 	/**

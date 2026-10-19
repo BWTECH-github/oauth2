@@ -23,6 +23,7 @@ namespace OCA\OAuth2\BackgroundJob;
 use OC\BackgroundJob\TimedJob;
 use OCA\OAuth2\Db\AccessTokenMapper;
 use OCA\OAuth2\Db\AuthorizationCodeMapper;
+use OCA\OAuth2\Db\RefreshTokenMapper;
 
 class CleanUp extends TimedJob {
 	/**
@@ -30,14 +31,22 @@ class CleanUp extends TimedJob {
 	 */
 	protected $interval = 86400;
 
+	/**
+	 * Ausgetauschte Refresh-Tokens bleiben nur für die Gnadenfrist (höchstens
+	 * eine Stunde) stehen; nach einem Tag sind sie sicher überflüssig.
+	 */
+	public const EXCHANGED_REFRESH_TOKEN_RETENTION = 86400;
+
 	public function __construct(
 		protected AuthorizationCodeMapper $authorizationCodeMapper,
-		protected AccessTokenMapper $accessTokenMapper
+		protected AccessTokenMapper $accessTokenMapper,
+		protected RefreshTokenMapper $refreshTokenMapper
 	) {
 	}
 
 	/**
-	 * Cleans up expired authorization codes and access tokens.
+	 * Cleans up expired authorization codes and access tokens, and refresh
+	 * tokens that were exchanged more than a day ago.
 	 *
 	 * @param string $argument
 	 */
@@ -45,5 +54,6 @@ class CleanUp extends TimedJob {
 	public function run($argument): void {
 		$this->authorizationCodeMapper->cleanUp();
 		$this->accessTokenMapper->cleanUp();
+		$this->refreshTokenMapper->cleanUp(\time() - self::EXCHANGED_REFRESH_TOKEN_RETENTION);
 	}
 }

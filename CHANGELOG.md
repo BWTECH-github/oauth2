@@ -6,6 +6,69 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
+## [0.10.0] - 2026-10-19
+
+Desktop-Clients und `owncloudcmd` mussten sich neu anmelden, obwohl ihr
+Refresh-Token noch galt. Ursache auf dem Server: Der Austausch eines
+Refresh-Tokens löschte das alte Refresh- und das alte Access-Token sofort
+und legte das neue Paar danach ohne Transaktion an. Ging die Antwort
+verloren – der Client gab nach 30 s auf, ein Proxy antwortete mit 504, die
+Verbindung brach ab, der Rechner ging in den Ruhezustand –, scheiterte die
+Wiederholung mit `invalid_grant`, und der Client verwarf das Refresh-Token.
+Zwei gleichzeitige Austauschanfragen ergaben mehrere gültige Nachfolger
+und/oder `invalid_grant`. Die zweite Stelle steigt wegen der neuen
+Migration (siehe 0.8.0); 0.9.1 und 0.9.2 gehören zur Redesign-Linie.
+
+**Hinweis für Nutzer des offiziellen Desktop-Clients 6.0.3:** Diese
+Version beseitigt serverseitig den häufigsten Weg zur Neuanmeldung, ohne
+dass sich am Client etwas ändert. Wer 6.0.3 auf einem Kern ohne die App
+`brute_force_protection` betreibt, sollte diese App zusätzlich aktivieren
+(oder im Webserver für `/index.php/apps/oauth2/api/v1/token` den
+`Cookie`-Header entfernen): 6.0.3 schickt die Token-Anfrage mit dem
+Sitzungs-Cookie, der Kern wertet Client-Kennung und Geheimnis dann als
+Anmeldeversuch („Login failed“) und bremst bis zu 30 s – genau so lange,
+wie 6.0.3 auf die Antwort wartet. Wartungen unter einer Minute halten:
+6.0.3 meldet nach drei gescheiterten Erneuerungen ab.
+
+### Fixed
+
+- **Austausch idempotent mit Gnadenfrist.** Ein ausgetauschtes
+  Refresh-Token bleibt als verbraucht stehen (neue Spalten `rotated_at` und
+  `successor_id` in `oauth2_refresh_tokens`, Migration
+  `Version20261019120000`). Kommt es innerhalb der Gnadenfrist (Standard
+  180 s) noch einmal und ist sein Nachfolger noch unverbraucht, liefert der
+  Token-Endpunkt dasselbe neue Paar wie beim Austausch, statt
+  `invalid_grant`. Das bisherige Access-Token gilt ebenso lange weiter,
+  damit Anfragen, die noch unterwegs sind, nicht mit 401 enden. Danach – oder
+  sobald das neue Refresh-Token selbst benutzt wurde – antwortet das alte mit
+  `invalid_grant` wie bisher.
+- **Austausch in einer Transaktion.** Neues Paar anlegen und das alte als
+  verbraucht vermerken laufen zusammen; vermerkt wird nur, wenn es noch
+  unverbraucht ist. Von gleichzeitigen Anfragen mit demselben
+  Refresh-Token tauscht genau eine aus, die anderen bekommen deren Paar.
+- **Index auf `oauth2_refresh_tokens.token`.** Der Token-Endpunkt suchte das
+  Refresh-Token ohne Index; mit wachsender Tabelle wurde jeder Austausch
+  langsamer. Ein zweiter Index auf `successor_id` hält das Aufräumen
+  billig.
+- **Verbrauchte Refresh-Tokens werden aufgeräumt:** beim nächsten Austausch
+  ihres Nachfolgers und täglich im Hintergrundjob (älter als ein Tag).
+
+### Added
+
+- `occ config:app:set oauth2 refresh_token_grace_period --value <Sekunden>`
+  (0 bis 3600, Standard 180, 0 schaltet die Gnadenfrist ab).
+- `occ config:app:set oauth2 access_token_lifetime --value <Sekunden>`
+  (10 bis 86400, Standard 3600) für die Lebensdauer neuer Access-Tokens,
+  etwa für Tests mit kurzer Lebensdauer; `expires_in` nennt den Wert.
+
+### Security
+
+- **Bearer-Tokens nicht mehr im Log.** Bei `loglevel` 0 schrieb das
+  Bearer-Modul abgelaufene und unbekannte Access-Tokens im Klartext ins Log.
+- Die Gnadenfrist lässt ein schon ausgetauschtes Refresh-Token kurz weiter
+  gelten (wie die „grace period“ anderer Anbieter). Wer das nicht will,
+  setzt `refresh_token_grace_period` auf 0.
+
 ## [0.9.0] - 2026-10-14
 
 Server-Seite für den Desktop-Client, der nach RFC 8252 auf
