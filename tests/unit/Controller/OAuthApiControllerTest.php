@@ -194,11 +194,13 @@ class OAuthApiControllerTest extends TestCase {
 			$this->clientMapper->delete($this->desktopClient);
 			$this->desktopClient = null;
 		}
+		// Tokens nicht liegen lassen: andere Tests legen dieselben Zeichenketten an (eindeutiger Index auf access_tokens.token)
+		$this->accessTokenMapper->deleteAll();
+		$this->refreshTokenMapper->deleteAll();
 		$config = \OC::$server->getConfig();
 		$config->deleteAppValue('oauth2', 'access_token_lifetime');
 		$config->deleteAppValue('oauth2', 'refresh_token_grace_period');
-		$_SERVER['PHP_AUTH_USER'] = null;
-		$_SERVER['PHP_AUTH_PW'] = null;
+		unset($_SERVER['PHP_AUTH_USER'], $_SERVER['PHP_AUTH_PW']);
 	}
 
 	/**
