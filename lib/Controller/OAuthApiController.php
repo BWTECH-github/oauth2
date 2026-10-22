@@ -285,7 +285,10 @@ class OAuthApiController extends ApiController {
 			$rotated = $this->refreshTokenMapper->markRotated($refreshToken->getId(), $newRefreshToken->getId(), $now) === 1;
 			if ($rotated) {
 				// Anfragen mit dem bisherigen Access-Token, die noch unterwegs sind, gehen während der Gnadenfrist durch
-				$this->accessTokenMapper->limitExpiry($refreshToken->getAccessTokenId(), $now + $gracePeriod);
+				// Refresh-Tokens aus 0.1.0 (2017) haben kein Access-Token (access_token_id NULL): nichts zu verlängern
+				if ($refreshToken->getAccessTokenId() !== null) {
+					$this->accessTokenMapper->limitExpiry($refreshToken->getAccessTokenId(), $now + $gracePeriod);
+				}
 				$this->db->commit();
 			} else {
 				$this->db->rollBack();
