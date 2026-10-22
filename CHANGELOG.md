@@ -6,6 +6,18 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
+## [0.10.2] - 2026-10-22
+
+Redesign-Linie: übernimmt aus main 0.10.1.
+
+### Fixed
+
+- **Austausch sehr alter Refresh-Tokens.** Refresh-Tokens aus oauth2 0.1.0
+  (2017) haben kein zugehöriges Access-Token (`access_token_id` NULL). Seit
+  0.10.0 endete ihr Austausch mit einem TypeError und HTTP 500 statt mit einem
+  neuen Token-Paar; die Verlängerung des alten Access-Tokens wird jetzt
+  übersprungen, wenn es keines gibt.
+
 ## [0.10.1] - 2026-10-19
 
 Redesign-Linie: übernimmt aus main 0.10.0 den idempotenten Austausch des
