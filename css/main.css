@@ -1,3 +1,30 @@
 .form-inline {
 	display: inline;
 }
+
+/* Persoenliche Einstellungen: autorisierte Anwendungen als Liste ueber die
+   ganze Karte, Widerrufsknopf rechtsbuendig */
+#oauth2 .oauth2-authorized-wrap {
+	max-width: 100%;
+	overflow-x: auto;
+}
+
+#oauth2 .oauth2-authorized {
+	width: 100%;
+	max-width: 100%;
+	white-space: normal;
+}
+
+#oauth2 .oauth2-authorized td {
+	overflow-wrap: anywhere;
+}
+
+#oauth2 .oauth2-authorized .oauth2-col-remove,
+#oauth2 .oauth2-authorized #headerRemove {
+	width: 48px;
+	text-align: right;
+}
+
+#oauth2 .oauth2-empty {
+	color: var(--oco-text-secondary, #5b6675);
+}

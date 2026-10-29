@@ -17,14 +17,24 @@
  */
 
 $(document).ready(function () {
-	var elements = document.querySelectorAll('.delete');
-
-	for (var i = 0; i < elements.length; i++) {
-		elements[i].addEventListener('submit', function (event) {
-			event.preventDefault();
-			if (confirm(this.getAttribute('data-confirm'))) {
-				this.submit();
-			}
-		}, false);
-	}
+	// Rueckfrage im Kerndialog statt window.confirm(): gleiche Optik wie jede
+	// andere Rueckfrage, Escape bricht ab und der Kerndialog gibt den Fokus an
+	// den Widerrufsknopf zurueck. form.submit() loest kein submit-Ereignis aus,
+	// die Bestaetigung laeuft also nicht im Kreis.
+	$('#oauth2').on('submit', 'form.delete', function (event) {
+		event.preventDefault();
+		var form = this;
+		OC.dialogs.confirm(
+			form.getAttribute('data-confirm'),
+			t('oauth2', 'Revoke authorization'),
+			function (confirmed) {
+				if (confirmed) {
+					form.submit();
+				}
+			},
+			true,
+			t('core', 'Cancel'),
+			t('oauth2', 'Revoke authorization')
+		);
+	});
 });

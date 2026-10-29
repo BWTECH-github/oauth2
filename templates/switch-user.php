@@ -23,15 +23,13 @@ style('oauth2', 'authorization');
 script('oauth2', 'switch-user');
 ?>
 
-<div class="error">
-	<p><b><?php p($l->t('Switch user')); ?></b></p>
-	<br>
+<div class="error oauth2-consent">
+	<p class="oauth2-consent-title"><strong><?php p($l->t('Switch user')); ?></strong></p>
 	<p><?php
 		print_unescaped($l->t(
 			'You are logged in as %s but the application requested access for user %s.',
 			[$_['current_user'], $_['requested_user']]
 		)); ?>
 	</p>
-	<br>
-	<a class="button" href="<?php p($_['logout_url']); ?>" autofocus><?php p($l->t('Switch users to continue')); ?></a>
+	<a class="button login-button oauth2-link-button" href="<?php p($_['logout_url']); ?>" autofocus><?php p($l->t('Switch users to continue')); ?></a>
 </div>

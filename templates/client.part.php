@@ -3,22 +3,21 @@
 	$client = $_['client'];
 } ?>
 
-<tr>
-	<td><?php p($client->getName()); ?></td>
-	<td><?php p($client->getRedirectUri()); ?></td>
-	<td><code class="oauth2-identifier"><?php p($client->getIdentifier()); ?></code></td>
-	<td><code><?php p($client->getSecret()); ?></code></td>
-	<?php if ($client->getAllowSubdomains()): ?>
-		<td class="icon-32 icon-checkmark"><span class="hidden-visually"><?php p($l->t('Yes')); ?></span></td>
-	<?php else: ?>
-		<td><span class="hidden-visually"><?php p($l->t('No')); ?></span></td>
-	<?php endif; ?>
-	<?php if ($client->getTrusted()): ?>
-		<td class="icon-32 icon-checkmark"><span class="hidden-visually"><?php p($l->t('Yes')); ?></span></td>
-	<?php else: ?>
-		<td><span class="hidden-visually"><?php p($l->t('No')); ?></span></td>
-	<?php endif; ?>
-	<td>
-		<button type="button" class="button icon-delete" data-id="<?php p($client->getId()) ?>" aria-label="<?php p($l->t('Delete')); ?>" title="<?php p($l->t('Delete')); ?>"></button>
+<?php /* Die sichtbaren Beschriftungen in den Zellen stehen fuer die gestapelte
+	Darstellung (css/settings-admin.css); Vorleseprogramme bekommen sie ueber die
+	Spaltenkoepfe, deshalb aria-hidden. */ ?>
+<tr role="row">
+	<td role="cell" class="oauth2-col-name"><?php p($client->getName()); ?></td>
+	<td role="cell" class="oauth2-col-uri"><span class="oauth2-cell-label" aria-hidden="true"><?php p($l->t('Redirection URI')); ?></span><span class="oauth2-value"><?php p($client->getRedirectUri()); ?></span></td>
+	<td role="cell" class="oauth2-col-code"><span class="oauth2-cell-label" aria-hidden="true"><?php p($l->t('Client Identifier')); ?></span><code class="oauth2-identifier"><?php p($client->getIdentifier()); ?></code></td>
+	<td role="cell" class="oauth2-col-code"><span class="oauth2-cell-label" aria-hidden="true"><?php p($l->t('Secret')); ?></span><code><?php p($client->getSecret()); ?></code></td>
+	<?php foreach ([[$client->getAllowSubdomains(), $l->t('Subdomains allowed')], [$client->getTrusted(), $l->t('Trusted client')]] as [$an, $titel]): ?>
+		<td role="cell" class="oauth2-col-flag<?php if (!$an): ?> oauth2-col-flag--off<?php endif; ?>">
+			<?php if ($an): ?><span class="oco-chip oco-chip--neutral" aria-hidden="true"><?php p($titel); ?></span><?php endif; ?>
+			<span class="hidden-visually"><?php p($an ? $l->t('Yes') : $l->t('No')); ?></span>
+		</td>
+	<?php endforeach; ?>
+	<td role="cell" class="oauth2-col-remove">
+		<button type="button" class="button icon-delete oauth2-delete" data-id="<?php p($client->getId()) ?>" aria-label="<?php p($l->t('Delete')); ?> – <?php p($client->getName()); ?>" title="<?php p($l->t('Delete')); ?>"></button>
 	</td>
 </tr>

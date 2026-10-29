@@ -27,33 +27,34 @@ style('oauth2', 'main');
 	<h2 class="app-name"><?php p($l->t('OAuth 2.0')); ?></h2>
 
 	<h3><?php p($l->t('Authorized Applications')); ?></h3>
-	<?php if (empty($_['clients'])) {
-		p($l->t('No applications authorized.'));
-	} else {
-		?>
-	<table class="grid">
+	<?php if (empty($_['clients'])) { ?>
+	<p class="oauth2-empty"><?php p($l->t('No applications authorized.')); ?></p>
+	<?php } else { ?>
+	<?php /* Eigener Behaelter: der Kern macht jede direkte Tabelle einer Karte
+		zum Rollkasten (display: block), die Zeilen blieben dann so schmal wie
+		ihr Inhalt statt ueber die Karte zu laufen. */ ?>
+	<div class="oauth2-authorized-wrap">
+	<table class="grid oauth2-authorized">
 		<thead>
 		<tr>
 			<th id="headerName" scope="col"><?php p($l->t('Name')); ?></th>
-			<th id="headerRemove" width="45px">&nbsp;</th>
+			<th id="headerRemove" scope="col"><span class="hidden-visually"><?php p($l->t('Revoke authorization')); ?></span></th>
 		</tr>
 		</thead>
 		<tbody>
-		<?php foreach ($_['clients'] as $client) {
-			?>
+		<?php foreach ($_['clients'] as $client) { ?>
 			<tr>
 				<td><?php p($client->getName()); ?></td>
-				<td>
+				<td class="oauth2-col-remove">
 					<form class="form-inline delete" data-confirm="<?php p($l->t('Are you sure you want to delete this item?')); ?>" action="<?php p($_['urlGenerator']->linkToRoute('oauth2.settings.revokeAuthorization', ['id' => $client->getId()])); ?>" method="post">
 						<input type="hidden" name="requesttoken" value="<?php p($_['requesttoken']) ?>" />
-						<input type="submit" class="button icon-delete" value="" aria-label="<?php p($l->t('Revoke authorization')); ?>" title="<?php p($l->t('Revoke authorization')); ?>">
+						<input type="submit" class="button icon-delete" value="" aria-label="<?php p($l->t('Revoke authorization')); ?> – <?php p($client->getName()); ?>" title="<?php p($l->t('Revoke authorization')); ?>">
 					</form>
 				</td>
 			</tr>
-		<?php
-		} ?>
+		<?php } ?>
 		</tbody>
 	</table>
-	<?php
-	} ?>
+	</div>
+	<?php } ?>
 </div>

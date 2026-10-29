@@ -5,7 +5,7 @@
     "Name must not be empty" : "Name darf nicht leer sein.",
     "Redirect URI must not be empty" : "Redirect URI darf nicht leer sein",
     "Redirect URI must be a valid URL" : "Redirect URI muss eine valide URL sein",
-    "Name %s already exists" : "Name %s existiert  bereits",
+    "Name %s already exists" : "Name %s existiert bereits",
     "Client id must be a number" : "Client id muss eine Nummer sein",
     "The application was authorized successfully. You can now close this window." : "Die Anwendung wurde erfolgreich autorisiert. Du kannst das Fenster nun schliessen.",
     "Request not valid" : "Anfrage nicht gültig",

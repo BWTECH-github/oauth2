@@ -1,19 +1,72 @@
-button,
-a.button {
-	width: 100%;
-	font-size: larger;
+/*
+ * Gastseiten der Autorisierung (Zustimmung, Nutzerwechsel, Weiterleitung,
+ * Erfolg). Knoepfe wie die Anmeldeseite: Hauptaktion als Teal-Knopf
+ * (.login-button aus dem Kern), Zweitaktion als Textverweis wie
+ * "Passwort vergessen?".
+ */
+
+#body-login .v-align .oauth2-consent p {
+	margin: 0;
 }
 
-/* Anchor styled as button: match the core button look and keep block layout */
-a.button {
-	display: inline-block;
+#body-login .v-align .oauth2-consent p + p {
+	margin-top: 12px;
+}
+
+#body-login .v-align .oauth2-consent .oauth2-consent-title {
+	font-size: 15px;
+	line-height: 1.45;
+}
+
+#body-login .v-align .oauth2-consent-form {
+	display: block;
+	margin: 0;
+}
+
+#body-login .v-align .oauth2-consent .login-button {
+	margin-top: 20px;
+}
+
+/* Verweis im Knopfgewand: der Kern zeichnet .login-button fuer <button>
+   (feste Hoehe ohne Zeilenhoehe) - ein <a> braucht die Mitte selbst, und
+   ein langer Text darf umbrechen statt die Karte zu sprengen. */
+#body-login .v-align a.oauth2-link-button {
+	display: flex;
+	align-items: center;
+	justify-content: center;
 	box-sizing: border-box;
+	width: 100%;
+	height: auto;
+	min-height: 52px;
+	padding: 10px 16px;
+	line-height: 1.3;
 	text-align: center;
+	text-decoration: none;
+	white-space: normal;
+	/* Kern: ".error a.button { color: #555 !important }" (styles.css) -
+	   grau auf Teal; die Schrift der Anmeldeknoepfe nur mit !important */
+	color: #0f2436 !important;
+}
+
+#body-login .v-align a.oauth2-switch-user {
+	display: inline-block;
+	margin-top: 12px;
+	padding: 6px 8px;
+	border-radius: 8px;
+	color: var(--oco-teal-ink, #00806c);
+	font-size: 14px;
+	font-weight: 600;
 	text-decoration: none;
 }
 
-/* Visible keyboard focus indicator (WCAG 2.4.7) */
-a.button:focus-visible {
-	outline: 2px solid #0082c9;
+#body-login .v-align a.oauth2-switch-user:hover {
+	color: #005f50;
+	background: rgba(0, 228, 189, .12);
+	text-decoration: underline;
+}
+
+#body-login .v-align a.oauth2-switch-user:focus-visible,
+#body-login .v-align a.oauth2-link-button:focus-visible {
+	outline: 2px solid var(--oco-focus-color, #00b39b);
 	outline-offset: 2px;
 }

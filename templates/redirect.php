@@ -25,10 +25,8 @@ style('oauth2', 'authorization');
 script('oauth2', 'redirect');
 ?>
 
-<div class="error">
-	<p><b><?php p($l->t('Returning to “%s”', [$_['client_name']])); ?></b></p>
-	<br>
+<div class="error oauth2-consent">
+	<p class="oauth2-consent-title"><strong><?php p($l->t('Returning to “%s”', [$_['client_name']])); ?></strong></p>
 	<p><?php p($l->t('You will be redirected to the application automatically. If nothing happens, use the button below.')); ?></p>
-	<br>
-	<a id="oauth2-redirect-link" class="button" href="<?php p($_['redirect_url']); ?>" autofocus><?php p($l->t('Continue to “%s”', [$_['client_name']])); ?></a>
+	<a id="oauth2-redirect-link" class="button login-button oauth2-link-button" href="<?php p($_['redirect_url']); ?>" autofocus><?php p($l->t('Continue to “%s”', [$_['client_name']])); ?></a>
 </div>

@@ -1,3 +1,175 @@
-#td-allow-subdomains {
-	text-align: center;
+/*
+ * OAuth-2.0-Karte der Verwaltung (Nutzer-Authentifizierung).
+ *
+ * Client-ID und Geheimnis sind je 64 Zeichen ohne Leerzeichen. Als
+ * Tabellenspalten nebeneinander war die Tabelle 1800 px breit - in der
+ * 900-px-Karte lagen Geheimnis, Kennzeichen und Loeschknopf unsichtbar
+ * rechts ausserhalb. Jede Zeile ist deshalb ein Block: Name, darunter die
+ * Werte mit kleiner Beschriftung, Kennzeichen als Chips, Loeschknopf oben
+ * rechts. Die Tabellensemantik bleibt ueber die Rollen im Markup.
+ */
+
+#oauth2 .oauth2-clients {
+	display: block;
+	width: 100%;
+	max-width: 100%;
+	margin: 0 0 var(--oco-space-5, 20px);
+	white-space: normal;
+	border-collapse: collapse;
+}
+
+/* display:block oben schlaegt .hidden aus dem Kern - Gegenregel */
+#oauth2 .oauth2-clients.hidden {
+	display: none;
+}
+
+/* Spaltenkoepfe nur fuer Vorleseprogramme: die Werte tragen ihre
+   Beschriftung in der gestapelten Zeile selbst */
+#oauth2 .oauth2-clients thead {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	overflow: hidden;
+	clip-path: inset(50%);
+	white-space: nowrap;
+}
+
+#oauth2 .oauth2-clients tbody {
+	display: block;
+	border-top: 1px solid var(--oco-border-inner, #eef1f5);
+}
+
+#oauth2 .oauth2-clients tbody tr {
+	position: relative;
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px var(--oco-space-2, 8px);
+	height: auto;
+	padding: 14px 52px 14px 0;
+	border-bottom: 1px solid var(--oco-border, #e3e8ef);
+}
+
+#oauth2 .oauth2-clients tbody tr:hover {
+	background: transparent;
+}
+
+#oauth2 .oauth2-clients tbody td {
+	display: block;
+	flex: 1 0 100%;
+	min-width: 0;
+	height: auto;
+	padding: 0;
+	border: 0;
+	text-align: left;
+	font: 400 13px/1.45 var(--oco-font-text, system-ui, sans-serif);
+	color: var(--oco-text-secondary, #5b6675);
+	overflow-wrap: anywhere;
+}
+
+#oauth2 .oauth2-clients tbody td.oauth2-col-name {
+	font: 600 14px/1.35 var(--oco-font-ui, system-ui, sans-serif);
+	color: var(--oco-text-primary, #1f2733);
+}
+
+#oauth2 .oauth2-cell-label {
+	display: block;
+	margin-bottom: 2px;
+	font: 500 11px/1.3 var(--oco-font-text, system-ui, sans-serif);
+	letter-spacing: .06em;
+	text-transform: uppercase;
+	color: var(--oco-text-muted, #6a717c);
+}
+
+#oauth2 .oauth2-clients code {
+	display: block;
+	font: 400 12px/1.5 var(--oco-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+	color: var(--oco-text-primary, #1f2733);
+	word-break: break-all;
+	user-select: all;
+}
+
+/* Kennzeichen nebeneinander; ein ausgeschaltetes hat nur Vorlesetext */
+#oauth2 .oauth2-clients tbody td.oauth2-col-flag {
+	flex: 0 0 auto;
+}
+
+#oauth2 .oauth2-clients tbody td.oauth2-col-flag--off {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip-path: inset(50%);
+}
+
+#oauth2 .oauth2-clients tbody td.oauth2-col-remove {
+	position: absolute;
+	top: 10px;
+	right: 0;
+	width: auto;
+	flex: none;
+}
+
+/* --- Formular "Client hinzufuegen" -------------------------------------
+   Beschriftung ueber dem Feld statt Platzhalter im Feld. Der Kern macht
+   jedes Label der Einstellungen inline-flex (zwei Kennungen), die Spalte
+   haengt deshalb am Behaelter. */
+#oauth2 .oauth2-new-client {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-end;
+	gap: var(--oco-space-3, 12px) var(--oco-space-4, 16px);
+	max-width: 100%;
+}
+
+#oauth2 .oauth2-field {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	flex: 1 1 220px;
+	min-width: 0;
+	max-width: 320px;
+}
+
+#oauth2 .oauth2-field--uri {
+	flex-basis: 300px;
+	max-width: 440px;
+}
+
+#oauth2 .oauth2-field label {
+	font: 500 12px/1.35 var(--oco-font-text, system-ui, sans-serif);
+	color: var(--oco-text-secondary, #5b6675);
+}
+
+#oauth2 .oauth2-field input {
+	width: 100%;
+	margin: 0;
+	box-sizing: border-box;
+}
+
+#oauth2 .oauth2-options {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--oco-space-2, 8px) var(--oco-space-5, 20px);
+	flex: 1 0 100%;
+}
+
+#oauth2 .oauth2-option {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--oco-space-2, 8px);
+}
+
+#oauth2 .oauth2-actions {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--oco-space-2, 8px) var(--oco-space-4, 16px);
+	flex: 1 0 100%;
+}
+
+#oauth2 .oauth2-actions button {
+	margin: 0;
 }

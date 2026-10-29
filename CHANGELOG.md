@@ -6,6 +6,20 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
+## [0.10.3] - 2026-10-29
+
+### Fixed
+
+- Verwaltung: Die Client-Liste passt in jede Breite; Client-ID, Geheimnis,
+  Kennzeichen und Löschknopf sind immer sichtbar. Anlegen und Löschen melden
+  ihr Ergebnis im Statusfeld, Löschen fragt im Dialog nach. Das Formular hat
+  sichtbare Beschriftungen, Enter legt den Client an.
+- Persönliche Einstellungen: Der Widerruf fragt im Dialog der Oberfläche;
+  die Liste läuft über die ganze Karte.
+- Zustimmungs-, Nutzerwechsel- und Weiterleitungsseite: Knöpfe und Verweise
+  wie auf der Anmeldeseite.
+- Sprache (de, de_CH): doppeltes Leerzeichen in „Name … existiert bereits“.
+
 ## [0.10.2] - 2026-10-22
 
 Redesign-Linie: übernimmt aus main 0.10.1.

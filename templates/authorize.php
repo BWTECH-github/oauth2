@@ -21,18 +21,17 @@
 style('oauth2', 'authorization');
 ?>
 
-<span class="error">
-	<form class="form-inline" action="" method="post">
-		<p>
-			<b><?php p($l->t('The “%s“ application would like permission to access your account', [$_['client_name']])); ?></b>
+<div class="error oauth2-consent">
+	<form class="oauth2-consent-form" action="" method="post">
+		<p class="oauth2-consent-title">
+			<strong><?php p($l->t('The “%s“ application would like permission to access your account', [$_['client_name']])); ?></strong>
 		</p>
-		<br>
 		<p><?php print_unescaped($l->t('You are logged in as %s.', [$_['current_user']])); ?></p>
-		<br>
 		<p><?php p($l->t('The application will gain access to your username and will be allowed to manage files, folders and shares.')); ?></p>
-		<br>
 		<input type="hidden" name="requesttoken" value="<?php p($_['requesttoken']) ?>" />
-		<button type="submit" autofocus><?php p($l->t('Authorize')); ?></button>
+		<button type="submit" class="login-button" autofocus><?php p($l->t('Authorize')); ?></button>
 	</form>
-		<a class="button" href="<?php p($_['logout_url']); ?>"><?php p($l->t('Switch users to continue')); ?></a>
-</span>
+	<?php /* Zweite Wahl als Textverweis wie "Passwort vergessen?" der
+		Anmeldeseite - als grauer Knopf sah er gesperrt aus. */ ?>
+	<a class="oauth2-switch-user" href="<?php p($_['logout_url']); ?>"><?php p($l->t('Switch users to continue')); ?></a>
+</div>
