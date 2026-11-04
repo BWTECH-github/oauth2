@@ -43,9 +43,6 @@
 	text-align: center;
 	text-decoration: none;
 	white-space: normal;
-	/* Kern: ".error a.button { color: #555 !important }" (styles.css) -
-	   grau auf Teal; die Schrift der Anmeldeknoepfe nur mit !important */
-	color: #0f2436 !important;
 }
 
 #body-login .v-align a.oauth2-switch-user {
