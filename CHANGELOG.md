@@ -6,6 +6,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased]
+
+### Fixed
+
+- Neuinstallation über Alttabellen ohne `oc_oauth2_clients` brach ab. Fehlende Tabellen aus der database.xml werden jetzt einzeln angelegt.
+
 ## [0.10.1] - 2026-10-22
 
 ### Fixed
