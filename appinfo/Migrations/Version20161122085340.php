@@ -6,6 +6,7 @@
 namespace OCA\oauth2\Migrations;
 
 use Doctrine\DBAL\Schema\Schema;
+use Doctrine\DBAL\Types\Type;
 use Doctrine\DBAL\Types\Types;
 use OC\DB\MDB2SchemaReader;
 use OCP\Migration\ISchemaMigration;
@@ -20,7 +21,52 @@ class Version20161122085340 implements ISchemaMigration {
 
 		// not that valid ....
 		$schemaReader = new MDB2SchemaReader(\OC::$server->getConfig(), \OC::$server->getDatabaseConnection()->getDatabasePlatform());
-		$schemaReader->loadSchemaFromFile(__DIR__ . '/../database.xml', $schema);
+		$fromXml = new Schema();
+		$schemaReader->loadSchemaFromFile(__DIR__ . '/../database.xml', $fromXml);
+		$existing = \array_filter($fromXml->getTables(), function ($table) use ($schema) {
+			return $schema->hasTable($table->getName());
+		});
+		if ($existing === []) {
+			$schemaReader->loadSchemaFromFile(__DIR__ . '/../database.xml', $schema);
+			return;
+		}
+		// Altbestand: oauth2_clients fehlt, andere Tabellen stehen schon. Die database.xml direkt zu laden
+		// scheiterte an den vorhandenen Tabellen, also nur die fehlenden übernehmen
+		self::copyMissingTables($fromXml, $schema);
+	}
+
+	/**
+	 * Legt jede Tabelle aus $from, die in $to fehlt, mit Spalten und Indizes in $to an.
+	 */
+	private static function copyMissingTables(Schema $from, Schema $to) {
+		foreach ($from->getTables() as $source) {
+			if ($to->hasTable($source->getName())) {
+				continue;
+			}
+			$table = $to->createTable($source->getName());
+			foreach ($source->getColumns() as $column) {
+				$table->addColumn($column->getName(), Type::getTypeRegistry()->lookupName($column->getType()), [
+					'notnull' => $column->getNotnull(),
+					'default' => $column->getDefault(),
+					'length' => $column->getLength(),
+					'precision' => $column->getPrecision(),
+					'scale' => $column->getScale(),
+					'fixed' => $column->getFixed(),
+					'unsigned' => $column->getUnsigned(),
+					'autoincrement' => $column->getAutoincrement(),
+					'comment' => $column->getComment(),
+				])->setPlatformOptions($column->getPlatformOptions());
+			}
+			foreach ($source->getIndexes() as $index) {
+				if ($index->isPrimary()) {
+					$table->setPrimaryKey($index->getColumns(), $index->getName());
+				} elseif ($index->isUnique()) {
+					$table->addUniqueIndex($index->getColumns(), $index->getName());
+				} else {
+					$table->addIndex($index->getColumns(), $index->getName());
+				}
+			}
+		}
 	}
 
 	/**

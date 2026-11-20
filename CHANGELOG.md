@@ -6,6 +6,14 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
+## [1.0.1] - 2026-11-20
+
+Redesign-Linie: übernimmt aus main 0.10.2.
+
+### Fixed
+
+- Neuinstallation über Alttabellen ohne `oc_oauth2_clients` brach ab. Fehlende Tabellen aus der database.xml werden jetzt einzeln angelegt.
+
 ## [1.0.0] - 2026-11-04
 
 Eigene Versionslinie des Redesign-Zweigs; Inhalt wie 0.10.3.
