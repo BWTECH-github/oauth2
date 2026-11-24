@@ -41,6 +41,7 @@
     "Revoke authorization" : "Zugriff widerrufen",
     "Yes" : "Ja",
     "No" : "Nein",
-    "Client id is unknown" : "Die Client-ID ist unbekannt."
+    "Client id is unknown" : "Die Client-ID ist unbekannt.",
+    "(required)" : "(erforderlich)"
 },"pluralForm" :"nplurals=2; plural=(n != 1);"
 }

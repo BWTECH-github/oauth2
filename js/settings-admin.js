@@ -2,16 +2,31 @@ $(document).ready(function () {
 	var $section = $('#oauth2');
 	var $form = $('#oauth2-new-client');
 	var msg = '#oauth2_save_msg';
+	// Felder, die der Server in einer Fehlerantwort nennt (SettingsController)
+	var felder = {
+		name: '#oauth2-client-name',
+		redirect_uri: '#oauth2-redirect-uri',
+		trusted: '#trusted'
+	};
 
 	// Rueckmeldung im Statusfeld der Karte. OC.msg erwartet die Meldung unter
 	// response.data.message, der Server schickt sie als errorMessage - ohne
 	// diese Uebersetzung blieb "Speichern ..." stehen (rot bei Fehlern).
+	// Nennt der Server ein Feld, haengt die Meldung dort: aria-invalid,
+	// aria-describedby, Fokus ins Feld (WCAG 3.3.1). Vorher blieb der Fokus
+	// auf "Hinzufuegen", und kein Feld trug den Fehler.
 	function zeigeErgebnis(data) {
 		if (data && data.status === 'success') {
 			OC.msg.finishedSuccess(msg, t('settings', 'Saved'));
 			return true;
 		}
 		OC.msg.finishedError(msg, (data && data.errorMessage) || t('core', 'Error'));
+		if (data && Object.prototype.hasOwnProperty.call(felder, data.field)) {
+			$(felder[data.field]).attr({
+				'aria-invalid': 'true',
+				'aria-describedby': 'oauth2_save_msg'
+			}).trigger('focus');
+		}
 		return false;
 	}
 
@@ -72,6 +87,7 @@ $(document).ready(function () {
 	// Echtes Formular: Enter in einem Feld legt den Client an wie der Knopf
 	$form.on('submit', function (event) {
 		event.preventDefault();
+		$form.find('[aria-invalid]').removeAttr('aria-invalid aria-describedby');
 		OC.msg.startSaving(msg);
 		$.post(
 			OC.generateUrl('apps/oauth2/clients'),

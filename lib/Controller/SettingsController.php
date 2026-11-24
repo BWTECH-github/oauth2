@@ -58,19 +58,19 @@ class SettingsController extends Controller {
 		$redirectUri = \trim((string)$this->request->getParam('redirect_uri', ''));
 		$name = \trim((string)$this->request->getParam('name', ''));
 		if ($name === '') {
-			return $this->sendErrorResponse($this->l10n->t('Name must not be empty'));
+			return $this->sendErrorResponse($this->l10n->t('Name must not be empty'), 'name');
 		}
 		if ($redirectUri === '') {
-			return $this->sendErrorResponse($this->l10n->t('Redirect URI must not be empty'));
+			return $this->sendErrorResponse($this->l10n->t('Redirect URI must not be empty'), 'redirect_uri');
 		}
 		if (!Utilities::isValidUrl($redirectUri)) {
-			return $this->sendErrorResponse($this->l10n->t('Redirect URI must be a valid URL'));
+			return $this->sendErrorResponse($this->l10n->t('Redirect URI must be a valid URL'), 'redirect_uri');
 		}
 
 		try {
 			// The name should be unique
 			$this->clientMapper->findByName($name);
-			return $this->sendErrorResponse($this->l10n->t('Name %s already exists', [$name]));
+			return $this->sendErrorResponse($this->l10n->t('Name %s already exists', [$name]), 'name');
 		} catch (DoesNotExistException) {
 			// expected when the client name is not a duplicate
 		}
@@ -87,7 +87,7 @@ class SettingsController extends Controller {
 
 		$rURI = new URL(Utilities::removeWildcardPort($redirectUri));
 		if (Utilities::isLoopbackHost($rURI->hostname) && $trusted) {
-			return $this->sendErrorResponse($this->l10n->t('Cannot set localhost as trusted.'));
+			return $this->sendErrorResponse($this->l10n->t('Cannot set localhost as trusted.'), 'trusted');
 		}
 		$client->setTrusted($trusted);
 
@@ -168,14 +168,20 @@ class SettingsController extends Controller {
 		);
 	}
 
-	private function sendErrorResponse(string $message): JSONResponse {
-		return new JSONResponse(
-			[
-				'status' => 'error',
-				'errorMessage' => $message,
-				'data' => [] // OC.msg needs this
-			]
-		);
+	/**
+	 * @param string|null $field Formularfeld, an dem die Verwaltung die Meldung
+	 *        zeigt (name, redirect_uri, trusted)
+	 */
+	private function sendErrorResponse(string $message, ?string $field = null): JSONResponse {
+		$data = [
+			'status' => 'error',
+			'errorMessage' => $message,
+			'data' => [] // OC.msg needs this
+		];
+		if ($field !== null) {
+			$data['field'] = $field;
+		}
+		return new JSONResponse($data);
 	}
 
 	private function normalizeClientId($id): ?int {

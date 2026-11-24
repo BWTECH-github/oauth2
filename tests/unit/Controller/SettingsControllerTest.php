@@ -154,14 +154,14 @@ class SettingsControllerTest extends TestCase {
 	public function provideClientData(): array {
 		return [
 			// missing name
-			['test', null, null, 0],
+			['test', null, null, 0, 'name'],
 			// missing redirect Uri
-			[null, 'test', null, 0],
+			[null, 'test', null, 0, 'redirect_uri'],
 			// malformed redirect Uri
-			['test', 'test', null, 0],
+			['test', 'test', null, 0, 'redirect_uri'],
 			// everything is ok
-			[$this->redirectUri, $this->name, null, 1],
-			[$this->redirectUri, $this->name, '1', 1]
+			[$this->redirectUri, $this->name, null, 1, null],
+			[$this->redirectUri, $this->name, '1', 1, null]
 		];
 	}
 
@@ -172,8 +172,9 @@ class SettingsControllerTest extends TestCase {
 	 * @param string|null $name
 	 * @param string|null $allowSubdomains
 	 * @param integer $expectedClientCount
+	 * @param string|null $expectedField Feld, an dem die Verwaltung den Fehler zeigt
 	 */
-	public function testAddClient($redirectUri, $name, $allowSubdomains, $expectedClientCount): void {
+	public function testAddClient($redirectUri, $name, $allowSubdomains, $expectedClientCount, $expectedField): void {
 		$this->clientMapper->deleteAll();
 
 		$map = [
@@ -186,6 +187,7 @@ class SettingsControllerTest extends TestCase {
 		$result = $this->controller->addClient();
 		self::assertInstanceOf(JSONResponse::class, $result);
 		self::assertCount($expectedClientCount, $this->clientMapper->findAll());
+		self::assertSame($expectedField, $result->getData()['field'] ?? null);
 		if ($expectedClientCount === 1) {
 			/** @var Client $client */
 			$client = $this->clientMapper->findAll()[0];
@@ -245,6 +247,7 @@ class SettingsControllerTest extends TestCase {
 
 		self::assertEquals('error', $result->getData()['status']);
 		self::assertEquals('Cannot set localhost as trusted.', $result->getData()['errorMessage']);
+		self::assertSame('trusted', $result->getData()['field']);
 		self::assertCount(0, $this->clientMapper->findAll());
 	}
 

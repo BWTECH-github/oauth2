@@ -6,6 +6,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
+## [1.0.2] - 2026-11-24
+
+### Fixed
+
+- „Client hinzufügen“: Name und Weiterleitungsadresse tragen sichtbar „(erforderlich)“. Ein Fehler (leer, ungültige Adresse, Name vergeben, localhost als vertrauenswürdig) steht am betroffenen Feld, und der Fokus springt hinein; vorher blieb er auf „Hinzufügen“.
+
 ## [1.0.1] - 2026-11-20
 
 Redesign-Linie: übernimmt aus main 0.10.2.

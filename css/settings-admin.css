@@ -142,6 +142,15 @@
 	color: var(--oco-text-secondary, #5b6675);
 }
 
+/* „(erforderlich)“ hinter der Beschriftung, leiser als sie. Der Abstand steht
+   hier, weil das Label des Kerns ein Flex-Behälter ist (inline-flex) und ein
+   Leerzeichen davor nicht trägt. */
+#oauth2 .oauth2-field .oauth2-required {
+	margin-left: 4px;
+	font-weight: 400;
+	color: var(--oco-text-muted, #6a717c);
+}
+
 #oauth2 .oauth2-field input {
 	width: 100%;
 	margin: 0;
