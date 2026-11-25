@@ -43,7 +43,6 @@ OC.L10N.register(
     "Revoke authorization" : "Zugriff widerrufen",
     "Yes" : "Ja",
     "No" : "Nein",
-    "Client id is unknown" : "Die Client-ID ist unbekannt.",
-    "(required)" : "(erforderlich)"
+    "Client id is unknown" : "Die Client-ID ist unbekannt."
 },
 "nplurals=2; plural=(n != 1);");

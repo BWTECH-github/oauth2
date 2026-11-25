@@ -63,16 +63,17 @@ if (!empty($_['clients'])) {
 	</table>
 
 	<h3><?php p($l->t('Add client')); ?></h3>
-	<?php /* Beide Felder sind Pflicht (WCAG 3.3.2): „(erforderlich)“ steht sichtbar
-		in der Beschriftung und damit auch im Namen des Feldes, required dazu.
-		novalidate: die Meldung des Servers steht am Feld (js/settings-admin.js). */ ?>
+	<?php /* Beide Felder sind Pflicht und tragen required. Sichtbar gekennzeichnet
+		werden wie überall in owncloud.online nur freiwillige Felder („(optional)“,
+		WCAG 3.3.2). novalidate: die Meldung des Servers steht am Feld
+		(js/settings-admin.js). */ ?>
 	<form id="oauth2-new-client" class="oauth2-new-client" novalidate>
 		<div class="oauth2-field">
-			<label for="oauth2-client-name"><?php p($l->t('Name')); ?> <span class="oauth2-required"><?php p($l->t('(required)')); ?></span></label>
+			<label for="oauth2-client-name"><?php p($l->t('Name')); ?></label>
 			<input id="oauth2-client-name" name="name" type="text" autocomplete="off" spellcheck="false" required>
 		</div>
 		<div class="oauth2-field oauth2-field--uri">
-			<label for="oauth2-redirect-uri"><?php p($l->t('Redirection URI')); ?> <span class="oauth2-required"><?php p($l->t('(required)')); ?></span></label>
+			<label for="oauth2-redirect-uri"><?php p($l->t('Redirection URI')); ?></label>
 			<input id="oauth2-redirect-uri" name="redirect_uri" type="text" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://" required>
 		</div>
 		<div class="oauth2-options">

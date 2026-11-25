@@ -6,6 +6,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
+## [1.0.3] - 2026-11-25
+
+### Fixed
+
+- „Client hinzufügen“: Name und Weiterleitungsadresse ohne Zusatz „(erforderlich)“. Wie überall in owncloud.online sind Felder ohne Zusatz Pflicht, freiwillige tragen „(optional)“.
+
 ## [1.0.2] - 2026-11-24
 
 ### Fixed
