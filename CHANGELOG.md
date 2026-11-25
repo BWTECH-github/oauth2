@@ -6,6 +6,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
+## [1.0.5] - 2026-11-25
+
+### Fixed
+
+- Verwaltung › Nutzer-Authentifizierung: Der Fokusring der Löschknöpfe in der Client-Liste ist ganz sichtbar.
+
 ## [1.0.4] - 2026-11-25
 
 ### Fixed

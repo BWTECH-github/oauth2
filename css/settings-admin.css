@@ -103,10 +103,13 @@
 	clip-path: inset(50%);
 }
 
+/* Die Tabelle ist im Kern ein Rollkasten (overflow-x: auto) und schneidet
+   alles ab, was über ihren Rand ragt. Der Knopf rückt deshalb um die Breite
+   des Fokusrings samt Abstand nach innen, sonst fehlte rechts ein Pixel. */
 #oauth2 .oauth2-clients tbody td.oauth2-col-remove {
 	position: absolute;
 	top: 10px;
-	right: 0;
+	right: calc(var(--oco-focus-width, 2px) + var(--oco-focus-offset, 2px));
 	width: auto;
 	flex: none;
 }
