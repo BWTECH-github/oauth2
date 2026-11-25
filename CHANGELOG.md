@@ -6,6 +6,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
+## [1.0.4] - 2026-11-25
+
+### Fixed
+
+- Deutsche Texte: Das Feld heißt „Weiterleitungs-URI“ statt „URI weiterleiten“, die Meldungen am Feld nennen es genauso („… muss eine gültige URL sein.“). „Localhost kann nicht als vertrauenswürdig eingestuft werden.“ ohne Großschreibung.
+
 ## [1.0.3] - 2026-11-25
 
 ### Fixed
