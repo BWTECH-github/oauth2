@@ -116,13 +116,15 @@ sudo -u www-data php occ oauth2:add-client \
 
 Native apps receive the code on a local port that the operating system assigns
 at sign-in. Following [RFC 8252 §7.3](https://www.rfc-editor.org/rfc/rfc8252#section-7.3),
-a client with a loopback registration may return to the loopback IP literals
-with **any port**:
+a client with a loopback registration may return to `localhost`, `127.0.0.1`
+or `[::1]` with **any port**. The three are equivalent, whichever one is
+registered: Desktop Client 6.0.3 returns to `http://localhost:<port>`, newer
+clients to `http://127.0.0.1:<port>`.
 
 | Registered `redirect-url` | Accepted |
 | ------------------------- | -------- |
 | `http://localhost:*` (the built-in Desktop Client) | `http://localhost:<port>`, `http://127.0.0.1:<port>`, `http://[::1]:<port>` |
-| `http://127.0.0.1` or `http://[::1]`, with or without a port or `:*`, optionally with a path | `http://127.0.0.1:<port>` and `http://[::1]:<port>` |
+| `http://127.0.0.1` or `http://[::1]`, with or without a port or `:*`, optionally with a path | `http://localhost:<port>`, `http://127.0.0.1:<port>`, `http://[::1]:<port>` |
 | `http://localhost:<port>` (fixed port) | exactly that URI, as before |
 
 Path and query must be exactly as registered. Not accepted: other hosts,
