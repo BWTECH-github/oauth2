@@ -51,6 +51,10 @@ class Utilities {
 	 * Validates a redirection URI.
 	 */
 	public static function validateRedirectUri(string $expected, string $actual, bool $allowSubdomains): bool {
+		// Leerraum am Anfang und Ende zählt nicht (etwa ein gespeichertes
+		// „http://localhost:* “); mitten in der Adresse bleibt er ungültig
+		$expected = self::trimRedirectUri($expected);
+		$actual = self::trimRedirectUri($actual);
 		$withoutWildcardPort = self::removeWildcardPort($expected);
 		$validatePort = $withoutWildcardPort === $expected;
 		$expected = $withoutWildcardPort;
@@ -99,6 +103,16 @@ class Utilities {
 		} catch (TypeError) {
 			return false;
 		}
+	}
+
+	/**
+	 * Weiterleitungs-URI ohne Leerraum am Anfang und Ende - so wird sie
+	 * gespeichert und verglichen. Mit einem kopierten Leerzeichen am Ende
+	 * („http://localhost:* “) galt der Platzhalter-Port nicht, keine Anmeldung
+	 * ging. Leerraum mitten in der Adresse bleibt und macht sie ungültig.
+	 */
+	public static function trimRedirectUri(string $redirectUri): string {
+		return \trim($redirectUri);
 	}
 
 	/**

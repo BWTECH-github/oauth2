@@ -67,6 +67,10 @@ class ModifyClient extends Command {
 		$name = $input->getArgument('name');
 		$key = $input->getArgument('key');
 		$value = $input->getArgument('value');
+		if ($key === 'redirect-url') {
+			// Leerraum am Anfang und Ende gehört nicht zur Adresse
+			$value = Utilities::trimRedirectUri((string)$value);
+		}
 
 		try {
 			/** @var \OCA\OAuth2\Db\Client $client */

@@ -146,8 +146,42 @@ class UtilitiesTest extends TestCase {
 	}
 
 	/**
+	 * Leerraum am Anfang und Ende zählt nicht, mitten in der Adresse bleibt er
+	 * ungültig. Beim Kunden stand der Desktop Client als „http://localhost:* “
+	 * (Leerzeichen am Ende) in der Datenbank - der Platzhalter-Port galt dann
+	 * nicht, jede Anmeldung endete mit „Anfrage nicht gültig“.
+	 */
+	public function providesRedirectUrisWithWhitespace(): array {
+		return [
+			// angenommen: Leerraum am Anfang oder Ende der registrierten URI
+			'localhost:* mit Leerzeichen am Ende -> localhost' => [true, 'http://localhost:* ', 'http://localhost:49152', false],
+			'localhost:* mit Leerzeichen am Ende -> 127.0.0.1' => [true, 'http://localhost:* ', 'http://127.0.0.1:49152', false],
+			'localhost:* mit Zeilenumbruch am Ende' => [true, "http://localhost:*\r\n", 'http://localhost:49152', false],
+			'localhost:* mit Tabulator am Anfang' => [true, "\thttp://localhost:*", 'http://localhost:49152', false],
+			'127.0.0.1:* mit Leerzeichen am Ende -> localhost' => [true, 'http://127.0.0.1:* ', 'http://localhost:49152', false],
+			'localhost:*/cb mit Leerzeichen am Ende' => [true, 'http://localhost:*/cb ', 'http://localhost:1234/cb', false],
+			'oc:// mit Leerzeichen am Ende' => [true, 'oc://android.owncloud.com ', 'oc://android.owncloud.com', false],
+			'https mit Leerzeichen am Anfang' => [true, ' https://owncloud.org/cb', 'https://owncloud.org/cb', false],
+			// angenommen: Leerraum am Anfang oder Ende der gesendeten URI
+			'gesendet mit Leerzeichen am Ende' => [true, 'http://localhost:*', 'http://localhost:49152 ', false],
+			'gesendet mit Leerzeichen am Anfang' => [true, 'http://localhost:*', ' http://127.0.0.1:49152', false],
+			// abgelehnt: Leerraum mitten in der Adresse
+			'Leerzeichen im registrierten Host' => [false, 'http://local host:*', 'http://localhost:49152', false],
+			'Leerzeichen vor dem Platzhalter-Port' => [false, 'http://localhost :*', 'http://localhost:49152', false],
+			'Leerzeichen nach dem Platzhalter-Port' => [false, 'http://localhost:* /cb', 'http://localhost:49152/cb', false],
+			'Leerzeichen im gesendeten Host' => [false, 'http://localhost:*', 'http://local host:49152', false],
+			'Leerzeichen im gesendeten Port' => [false, 'http://localhost:*', 'http://localhost:49 152', false],
+			'Leerzeichen nach http://' => [false, 'http://localhost:*', 'http:// localhost:49152', false],
+			// abgelehnt: nur Leerraum
+			'registriert nur Leerraum' => [false, ' ', 'http://localhost:49152', false],
+			'gesendet nur Leerraum' => [false, 'http://localhost:*', ' ', false],
+		];
+	}
+
+	/**
 	 * @dataProvider providesUrlsToValidate
 	 * @dataProvider providesLoopbackRedirects
+	 * @dataProvider providesRedirectUrisWithWhitespace
 	 * @param $expectedResult
 	 * @param $expectedRedirect
 	 * @param $actualRedirect

@@ -117,4 +117,48 @@ class AddClientTest extends TestCase {
 
 		self::assertSame(0, $status);
 	}
+
+	/**
+	 * Leerraum am Anfang und Ende gehört nicht zur Adresse: Mit
+	 * „http://localhost:* “ (Leerzeichen am Ende) ging keine Anmeldung.
+	 */
+	public function providesRedirectUrisWithSurroundingWhitespace(): array {
+		return [
+			'Leerzeichen am Ende' => ['http://localhost:* ', 'http://localhost:*'],
+			'Tabulator und Zeilenumbruch' => ["\thttp://127.0.0.1:*\r\n", 'http://127.0.0.1:*'],
+			'Leerzeichen am Anfang' => [' oc://android.owncloud.com', 'oc://android.owncloud.com'],
+		];
+	}
+
+	/**
+	 * @dataProvider providesRedirectUrisWithSurroundingWhitespace
+	 */
+	public function testRedirectUriIsTrimmedWhenAdded(string $given, string $stored): void {
+		$this->clientMapper->expects($this->once())->method('insert')->with(
+			$this->callback(static function (Client $client) use ($stored) {
+				return $client->getRedirectUri() === $stored;
+			})
+		);
+
+		$status = $this->commandTester->execute([
+			'name' => 'Desktop',
+			'client-id' => self::ID,
+			'client-secret' => self::SECRET,
+			'redirect-url' => $given,
+		]);
+
+		self::assertSame(0, $status);
+	}
+
+	public function testRedirectUriWithWhitespaceInsideIsRefused(): void {
+		$this->clientMapper->expects($this->never())->method('insert');
+		$this->expectException(\InvalidArgumentException::class);
+
+		$this->commandTester->execute([
+			'name' => 'Desktop',
+			'client-id' => self::ID,
+			'client-secret' => self::SECRET,
+			'redirect-url' => 'http://local host:*',
+		]);
+	}
 }
