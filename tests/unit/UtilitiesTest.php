@@ -50,8 +50,8 @@ class UtilitiesTest extends TestCase {
 	/**
 	 * Loopback-Weiterleitung nach RFC 8252 §7.3: Ist die registrierte URI eine
 	 * Loopback-Adresse (http://localhost:* des Desktop-Clients, 127.0.0.1 oder
-	 * [::1]), gilt für 127.0.0.1 und [::1] jeder Port. Pfad und Query müssen
-	 * passen; localhost selbst bleibt, wie es war.
+	 * [::1]), sind localhost, 127.0.0.1 und [::1] gleichwertig und jeder Port
+	 * gilt. Pfad und Query müssen passen; localhost mit festem Port bleibt fest.
 	 */
 	public function providesLoopbackRedirects(): array {
 		return [
@@ -70,21 +70,40 @@ class UtilitiesTest extends TestCase {
 			'[::1] -> 127.0.0.1' => [true, 'http://[::1]/cb', 'http://127.0.0.1:50000/cb', false],
 			'127.0.0.1:* -> 127.0.0.1' => [true, 'http://127.0.0.1:*/cb', 'http://127.0.0.1:50000/cb', false],
 			'[::1]:* -> [::1]' => [true, 'http://[::1]:*', 'http://[::1]:50000', false],
+			// angenommen: localhost gleichwertig zu den Loopback-IPs - Desktop-Client
+			// 6.0.3 leitet auf http://localhost:<Port> weiter, neuere auf 127.0.0.1
+			'127.0.0.1:* -> localhost mit Port' => [true, 'http://127.0.0.1:*', 'http://localhost:49152', false],
+			'127.0.0.1:* -> localhost mit Port und Schrägstrich' => [true, 'http://127.0.0.1:*', 'http://localhost:1234/', false],
+			'127.0.0.1:* -> localhost ohne Port' => [true, 'http://127.0.0.1:*', 'http://localhost/', false],
+			'127.0.0.1 ohne Port -> localhost' => [true, 'http://127.0.0.1/cb', 'http://localhost:1234/cb', false],
+			'127.0.0.1 mit Port -> localhost anderer Port' => [true, 'http://127.0.0.1:8080/cb', 'http://localhost:50000/cb', false],
+			'[::1]:* -> localhost' => [true, 'http://[::1]:*', 'http://localhost:49152', false],
+			'[::1] -> localhost' => [true, 'http://[::1]/cb', 'http://localhost:50000/cb', false],
+			'127.0.0.1:* mit Pfad und Query -> localhost gleich' => [true, 'http://127.0.0.1:*/oc/10.0?q=1', 'http://localhost:1234/oc/10.0?q=1', false],
+			'127.0.0.1:* mit Subdomain-Erlaubnis -> localhost' => [true, 'http://127.0.0.1:*', 'http://localhost:1234', true],
 			// abgelehnt: Pfad und Query müssen passen
 			'localhost:* -> 127.0.0.1 anderer Pfad' => [false, 'http://localhost:*', 'http://127.0.0.1:1234/evil', false],
 			'localhost:* -> [::1] anderer Pfad' => [false, 'http://localhost:*', 'http://[::1]:1234/evil', false],
 			'127.0.0.1/cb -> 127.0.0.1 ohne Pfad' => [false, 'http://127.0.0.1/cb', 'http://127.0.0.1:1234/', false],
 			'localhost:* -> 127.0.0.1 mit Query' => [false, 'http://localhost:*', 'http://127.0.0.1:1234/?q=1', false],
 			'localhost:* mit Query -> 127.0.0.1 andere Query' => [false, 'http://localhost:*/oc?q=1', 'http://127.0.0.1:1234/oc?q=2', false],
+			'127.0.0.1:* -> localhost anderer Pfad' => [false, 'http://127.0.0.1:*', 'http://localhost:1234/evil', false],
+			'127.0.0.1:* -> localhost mit Query' => [false, 'http://127.0.0.1:*', 'http://localhost:1234/?q=1', false],
+			'127.0.0.1/cb -> localhost ohne Pfad' => [false, 'http://127.0.0.1/cb', 'http://localhost:1234/', false],
 			// abgelehnt: andere Schemata
 			'localhost:* -> https://127.0.0.1' => [false, 'http://localhost:*', 'https://127.0.0.1:1234', false],
 			'localhost:* -> ftp://127.0.0.1' => [false, 'http://localhost:*', 'ftp://127.0.0.1:1234/', false],
 			'https://127.0.0.1 ist keine Loopback-Registrierung' => [false, 'https://127.0.0.1/cb', 'https://127.0.0.1:1234/cb', false],
+			'https://127.0.0.1 -> https://localhost' => [false, 'https://127.0.0.1/cb', 'https://localhost:1234/cb', false],
 			'localhost:* -> http: ohne //' => [false, 'http://localhost:*', 'http:127.0.0.1:1234/', false],
+			'127.0.0.1:* -> https://localhost' => [false, 'http://127.0.0.1:*', 'https://localhost:1234', false],
+			'127.0.0.1:* -> http: ohne // auf localhost' => [false, 'http://127.0.0.1:*', 'http:localhost:1234/', false],
 			// abgelehnt: Benutzer-Info in der URI
 			'localhost:* -> Benutzer an 127.0.0.1' => [false, 'http://localhost:*', 'http://user@127.0.0.1:1234/', false],
 			'localhost:* -> Benutzer und Passwort an [::1]' => [false, 'http://localhost:*', 'http://user:pw@[::1]:1234/', false],
 			'localhost:* -> Benutzer an localhost' => [false, 'http://localhost:*', 'http://user@localhost:1234/', false],
+			'127.0.0.1:* -> Benutzer an localhost' => [false, 'http://127.0.0.1:*', 'http://user@localhost:1234/', false],
+			'127.0.0.1:* -> Benutzer und Passwort an localhost' => [false, 'http://127.0.0.1:*', 'http://user:pass@localhost:1234/', false],
 			'https -> Benutzer am registrierten Host' => [false, 'https://owncloud.org/cb', 'https://evil@owncloud.org/cb', false],
 			// abgelehnt: fremde Hosts, auch wenn sie nach Loopback aussehen
 			'localhost:* -> 127.0.0.1:Port@evil.com' => [false, 'http://localhost:*', 'http://127.0.0.1:1234@evil.com/', false],
@@ -95,6 +114,13 @@ class UtilitiesTest extends TestCase {
 			'localhost:* -> 127.0.0.2' => [false, 'http://localhost:*', 'http://127.0.0.2:1234/', false],
 			'localhost:* -> IPv4 als IPv6' => [false, 'http://localhost:*', 'http://[::ffff:127.0.0.1]:1234/', false],
 			'localhost:* -> IPv4 als Zahl' => [false, 'http://localhost:*', 'http://2130706433:1234/', false],
+			'127.0.0.1:* -> localhost.evil.example' => [false, 'http://127.0.0.1:*', 'http://localhost.evil.example:1234/', false],
+			'127.0.0.1:* -> 127.0.0.1.evil.example' => [false, 'http://127.0.0.1:*', 'http://127.0.0.1.evil.example:1234/', false],
+			'127.0.0.1:* -> localhost:Port@evil.example' => [false, 'http://127.0.0.1:*', 'http://localhost:1234@evil.example/', false],
+			'127.0.0.1:* -> localhost:Port\@evil.example' => [false, 'http://127.0.0.1:*', 'http://localhost:1234\@evil.example', false],
+			'127.0.0.1:* -> localhost. mit Punkt' => [false, 'http://127.0.0.1:*', 'http://localhost.:1234/', false],
+			'127.0.0.1:* mit Subdomain-Erlaubnis -> localhost.evil.example' => [false, 'http://127.0.0.1:*', 'http://localhost.evil.example:1234/', true],
+			'[::1]:* -> evil.example' => [false, 'http://[::1]:*', 'http://evil.example:1234/', false],
 			// abgelehnt: keine Loopback-Registrierung, kein beliebiger Port
 			'https-Registrierung -> 127.0.0.1' => [false, 'https://owncloud.org', 'http://127.0.0.1:1234/', false],
 			'http-Registrierung -> 127.0.0.1' => [false, 'http://example.com/cb', 'http://127.0.0.1:1234/cb', false],
@@ -106,12 +132,13 @@ class UtilitiesTest extends TestCase {
 			'localhost:*.example.com -> localhost.example.com' => [false, 'http://localhost:*.example.com', 'http://localhost.example.com:1234/', false],
 			'localhost:*.example.com -> localhost.example.com ohne Port' => [false, 'http://localhost:*.example.com', 'http://localhost.example.com/', false],
 			'127.0.0.1:*.example.com -> 127.0.0.1.example.com' => [false, 'http://127.0.0.1:*.example.com', 'http://127.0.0.1.example.com:1234/', false],
-			// localhost bleibt, wie es war
+			// localhost: mit Platzhalter jeder Port, mit festem Port bleibt er fest
 			'localhost:* -> localhost beliebiger Port' => [true, 'http://localhost:*', 'http://localhost:1234', false],
 			'localhost mit Port -> gleicher Port' => [true, 'http://localhost:8080/cb', 'http://localhost:8080/cb', false],
 			'localhost mit Port -> anderer Port' => [false, 'http://localhost:8080/cb', 'http://localhost:9090/cb', false],
 			'localhost mit Port -> 127.0.0.1' => [false, 'http://localhost:8080/cb', 'http://127.0.0.1:8080/cb', false],
-			'127.0.0.1 -> localhost' => [false, 'http://127.0.0.1/cb', 'http://localhost:1234/cb', false],
+			'localhost mit Port -> [::1]' => [false, 'http://localhost:8080/cb', 'http://[::1]:8080/cb', false],
+			'localhost ohne Port -> localhost mit Port' => [false, 'http://localhost/cb', 'http://localhost:1234/cb', false],
 			// eigene Schemata der Mobil-Apps unverändert
 			'oc:// gleich' => [true, 'oc://android.owncloud.com', 'oc://android.owncloud.com', false],
 			'oc:// anderer Host' => [false, 'oc://android.owncloud.com', 'oc://evil.com', false],
