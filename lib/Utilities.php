@@ -63,11 +63,14 @@ class Utilities {
 			}
 
 			// RFC 8252 §7.3: Für Loopback-Registrierungen muss jeder Port gehen -
-			// der Client bekommt ihn erst beim Anmelden vom Betriebssystem. Das
-			// gilt für die Loopback-IPs 127.0.0.1 und [::1]; localhost bleibt,
-			// wie es war (RFC 8252 §8.3 rät davon ab). Pfad und Query müssen wie
+			// der Client bekommt ihn erst beim Anmelden vom Betriebssystem.
+			// localhost, 127.0.0.1 und [::1] sind dabei gleichwertig, gleich wie
+			// der Client eingetragen ist: Desktop-Client 6.0.3 leitet auf
+			// http://localhost:<Port> weiter, neuere Clients auf
+			// http://127.0.0.1:<Port>. localhost mit festem Port ist keine
+			// Loopback-Registrierung und bleibt fest. Pfad und Query müssen wie
 			// registriert sein.
-			if (self::isLoopbackRegistration($expectedUrl, !$validatePort) && self::isLoopbackIpRedirect($actual, $actualUrl)) {
+			if (self::isLoopbackRegistration($expectedUrl, !$validatePort) && self::isLoopbackRedirect($actual, $actualUrl)) {
 				return $expectedUrl->pathname === $actualUrl->pathname
 					&& $expectedUrl->search === $actualUrl->search;
 			}
@@ -155,15 +158,16 @@ class Utilities {
 	}
 
 	/**
-	 * Weiterleitung auf eine Loopback-IP. Geprüft wird auch die Zeichenkette
-	 * selbst - wörtlich http://127.0.0.1 bzw. http://[::1], optional mit Port:
-	 * Der Browser folgt ihr, nicht diesem Parser, und http:127.0.0.1 etwa löst
-	 * er bei einem Server unter http relativ zu dessen Adresse auf.
-	 * Schreibweisen wie 2130706433 oder Benutzer-Info braucht kein Client.
+	 * Weiterleitung auf den eigenen Rechner: localhost, 127.0.0.1 oder [::1].
+	 * Geprüft wird auch die Zeichenkette selbst - wörtlich http://localhost,
+	 * http://127.0.0.1 bzw. http://[::1], optional mit Port: Der Browser folgt
+	 * ihr, nicht diesem Parser, und http:127.0.0.1 etwa löst er bei einem
+	 * Server unter http relativ zu dessen Adresse auf. Schreibweisen wie
+	 * 2130706433, localhost. oder Benutzer-Info braucht kein Client.
 	 */
-	private static function isLoopbackIpRedirect(string $actual, URL $actualUrl): bool {
-		return \preg_match('~^http://(127\.0\.0\.1|\[::1\])(:[0-9]{1,5})?(?=$|[/?#])~', $actual) === 1
-			&& \in_array($actualUrl->hostname, self::LOOPBACK_IPS, true);
+	private static function isLoopbackRedirect(string $actual, URL $actualUrl): bool {
+		return \preg_match('~^http://(localhost|127\.0\.0\.1|\[::1\])(:[0-9]{1,5})?(?=$|[/?#])~', $actual) === 1
+			&& self::isLoopbackHost($actualUrl->hostname);
 	}
 
 	private static function validateDomain(URL $expectedUrl, URL $actualUrl, bool $allowSubdomains): bool {
