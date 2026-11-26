@@ -89,4 +89,38 @@ class ModifyClientTest extends TestCase {
 			[ 'redirect-url', 'http://local', 'setRedirectUri'],
 		];
 	}
+
+	/**
+	 * Leerraum am Anfang und Ende gehört nicht zur Adresse: Mit
+	 * „http://localhost:* “ (Leerzeichen am Ende) ging keine Anmeldung.
+	 */
+	public function testRedirectUrlIsTrimmed(): void {
+		$client = new Client();
+		$client->setRedirectUri('http://localhost:*');
+		$this->clientMapper->method('findByName')->willReturn($client);
+		$this->clientMapper->expects($this->once())->method('update')->with($client);
+
+		$status = $this->commandTester->execute([
+			'name' => 'Desktop Client',
+			'key' => 'redirect-url',
+			'value' => " http://127.0.0.1:* \n",
+		]);
+
+		self::assertSame(0, $status);
+		self::assertSame('http://127.0.0.1:*', $client->getRedirectUri());
+	}
+
+	public function testRedirectUrlWithWhitespaceInsideIsRefused(): void {
+		$client = new Client();
+		$client->setRedirectUri('http://localhost:*');
+		$this->clientMapper->method('findByName')->willReturn($client);
+		$this->clientMapper->expects($this->never())->method('update');
+		$this->expectException(\InvalidArgumentException::class);
+
+		$this->commandTester->execute([
+			'name' => 'Desktop Client',
+			'key' => 'redirect-url',
+			'value' => 'http://local host:*',
+		]);
+	}
 }

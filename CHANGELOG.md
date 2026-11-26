@@ -6,11 +6,11 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
-## [1.0.6] - 2026-11-26
+## [1.1.0] - 2026-11-26
 
 ### Fixed
 
-- Desktop-Clients melden sich wieder an, wenn der Client als 127.0.0.1 statt localhost eingetragen ist.
+- Desktop-Clients melden sich wieder an, wenn ihr Eintrag ein Leerzeichen am Anfang oder Ende hat (beim Update bereinigt) oder 127.0.0.1 statt localhost nennt.
 
 ## [1.0.5] - 2026-11-25
 

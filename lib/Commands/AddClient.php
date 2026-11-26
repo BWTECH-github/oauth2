@@ -91,7 +91,8 @@ class AddClient extends Command {
 		$name = $input->getArgument('name');
 		$id = $input->getArgument('client-id');
 		$secret = $input->getArgument('client-secret');
-		$url = $input->getArgument('redirect-url');
+		// Leerraum am Anfang und Ende gehört nicht zur Adresse
+		$url = Utilities::trimRedirectUri((string)$input->getArgument('redirect-url'));
 		$allowSubDomains = $input->getArgument('allow-sub-domains');
 		$trusted = $input->getArgument('trusted');
 		$forceTrust = $input->getArgument('force-trust');

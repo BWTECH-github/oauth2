@@ -251,6 +251,42 @@ class SettingsControllerTest extends TestCase {
 		self::assertCount(0, $this->clientMapper->findAll());
 	}
 
+	/**
+	 * Leerraum am Anfang und Ende gehört nicht zur Adresse: Mit
+	 * „http://localhost:* “ (Leerzeichen am Ende) ging keine Anmeldung.
+	 */
+	public function testAddClientTrimsRedirectUri(): void {
+		$this->clientMapper->deleteAll();
+		$this->request->method('getParam')->willReturnMap([
+			['redirect_uri', '', " http://localhost:* \t"],
+			['name', '', 'Desktop'],
+			['allow_subdomains', null, null],
+			['trusted', null, null],
+		]);
+
+		$result = $this->controller->addClient();
+
+		self::assertEquals('success', $result->getData()['status']);
+		self::assertCount(1, $this->clientMapper->findAll());
+		self::assertSame('http://localhost:*', $this->clientMapper->findAll()[0]->getRedirectUri());
+	}
+
+	public function testAddClientRejectsWhitespaceInsideTheRedirectUri(): void {
+		$this->clientMapper->deleteAll();
+		$this->request->method('getParam')->willReturnMap([
+			['redirect_uri', '', 'http://local host:*'],
+			['name', '', 'Desktop'],
+			['allow_subdomains', null, null],
+			['trusted', null, null],
+		]);
+
+		$result = $this->controller->addClient();
+
+		self::assertEquals('error', $result->getData()['status']);
+		self::assertSame('redirect_uri', $result->getData()['field']);
+		self::assertCount(0, $this->clientMapper->findAll());
+	}
+
 	public function provideClientId(): array {
 		// Data providers are run before the class is configured.
 		// That's why we need a closure if we want to access $this->smth->property
